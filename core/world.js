@@ -51,31 +51,11 @@ export function createWorld(rng) {
   }
 
   for (let i = 0; i < AGENT_COUNT; i++) {
-    const id = makeAgent(rng.float() * width, rng.float() * height);
-    ecs.components.position.set(id, {
-      x: rng.float() * width,
-      y: rng.float() * height,
-    });
-    ecs.components.velocity.set(id, {
-      vx: (rng.float() - 0.5) * 40,
-      vy: (rng.float() - 0.5) * 40,
-    });
-    ecs.components.agent.set(id, {
-      colorHue: 200 + rng.int(-20, 20),
-      energy: 1.0,
-    });
+    makeAgent(rng.float() * width, rng.float() * height);
   }
 
   for (let i = 0; i < RESOURCE_COUNT; i++) {
-    const id = ecs.createEntity();
-    ecs.components.position.set(id, {
-      x: rng.float() * width,
-      y: rng.float() * height,
-    });
-    ecs.components.resource.set(id, {
-      amount: 1,
-      regenTimer: rng.float() * 5,
-    });
+    makeResource(rng.float() * width, rng.float() * height);
   }
 
   function physicsSystem(dt) {
@@ -212,7 +192,7 @@ export function createWorld(rng) {
   function lifeCycleSystem(dt) {
     const { position, velocity, agent } = ecs.components;
 
-    for (const [id, ag] of agent.entries()) {
+    for (const [id, ag] of Array.from(agent.entries())) {
       // Death
       if (ag.energy <= 0) {
         ecs.destroyEntity(id);
@@ -238,7 +218,6 @@ export function createWorld(rng) {
         childAgent.energy = ag.energy * 0.5;
 
         ag.energy *= 0.5;
-        newAgents.push(childId);
       }
     }
 
