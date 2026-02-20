@@ -48,19 +48,20 @@ export function createRenderer(canvas) {
     for (const [id, res] of resource.entries()) {
       const pos = position.get(id);
       if (!pos) continue;
-      const radius = 3 + res.amount * 2;
+      const radius = 2 + res.amount * 3;
       ctx.fillStyle = 'rgba(130, 220, 160, 0.85)';
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Draw agents as colored blobs with outline
+    // Draw agents as colored blobs with outline, radius maps to energy
     for (const [id, ag] of agent.entries()) {
       const pos = position.get(id);
       if (!pos) continue;
       const hue = ag.colorHue;
-      const radius = 5;
+      const energy = ag.energy ?? 1;
+      const radius = 4 + Math.min(2.5, energy * 2);
       ctx.fillStyle = `hsla(${hue}, 75%, 65%, 0.95)`;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
