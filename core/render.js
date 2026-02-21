@@ -186,7 +186,7 @@ export function createRenderer(canvas) {
       if (!pos) continue;
       const energy = pred.energy ?? 1.5;
       const age = pred.age ?? 0;
-      const radiusBase = 6 + Math.min(4, energy * 2.5);
+      const radiusBase = 6 + energy * 2.5;
       const radius = age > 12 ? radiusBase * 1.15 : radiusBase;
       const dna = pred.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       const hue = pred.colorHue;
@@ -226,7 +226,7 @@ export function createRenderer(canvas) {
       if (!pos) continue;
       const energy = ap.energy ?? 3;
       const age = ap.age ?? 0;
-      const radiusBase = 9 + Math.min(6, energy * 2);
+      const radiusBase = 9 + energy * 2;
       const radius = age > 20 ? radiusBase * 1.2 : radiusBase;
       const hue = ap.colorHue;
 
@@ -261,7 +261,7 @@ export function createRenderer(canvas) {
       const mature = age >= 6 && age < 20;
       const elder = age >= 20;
 
-      let radius = 4 + Math.min(2.5, energy * 2);
+      let radius = 4 + energy * 2;
       if (young) radius *= 0.75;
       else if (elder) radius *= 1.15;
 
