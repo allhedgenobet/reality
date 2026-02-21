@@ -63,10 +63,12 @@ export function createRenderer(canvas) {
       const baseRadius = 2 + res.amount * 3;
       const radius = baseRadius * growthFactor;
 
-      // Color shifts slightly with stage
-      const baseG = 220;
-      const baseB = 160;
-      const shade = 130 - stage * 2; // subtle darkening
+      // Color shifts slightly with stage and kind
+      const isPod = res.kind === 'pod';
+      const baseG = isPod ? 210 : 220;
+      const baseB = isPod ? 200 : 160;
+      const baseR = isPod ? 150 : 130;
+      const shade = baseR - stage * 2; // subtle darkening
       const g = baseG - stage * 1.5;
       const b = baseB - stage;
       const alpha = 0.75 + (stage / 9) * 0.15;
@@ -77,6 +79,15 @@ export function createRenderer(canvas) {
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
       ctx.fill();
+
+      // Seed pods get a distinct outline
+      if (isPod) {
+        ctx.strokeStyle = `rgba(${shade + 20}, ${g + 10}, ${b + 20}, 0.9)`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius + 1, 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
       // Circuitboard-style branches: mature stages sprout orthogonal traces
       if (stage >= 5) {

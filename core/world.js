@@ -310,15 +310,12 @@ export function createWorld(rng) {
       }
     }
 
-    // Cap population to avoid explosions
-    const maxAgents = 120;
+    // Cap population to avoid catastrophic explosions: gently throttle reproduction instead of killing
+    const maxAgents = 160;
     if (agent.size > maxAgents) {
-      const toCull = agent.size - maxAgents;
-      let i = 0;
-      for (const id of Array.from(agent.keys())) {
-        if (i++ >= toCull) break;
-        ecs.destroyEntity(id);
-      }
+      world.globals.reproductionThreshold = 2.4; // temporarily raise threshold
+    } else if (agent.size < 120) {
+      world.globals.reproductionThreshold = 1.6; // normal
     }
   }
 
