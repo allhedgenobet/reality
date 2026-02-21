@@ -239,6 +239,9 @@ export function createWorld(rng) {
       const vel = velocity.get(id);
       if (!pos || !vel) continue;
 
+      // Resting predators drift but do not aggressively seek
+      if (pred.rest && pred.rest > 0) continue;
+
       const dna = pred.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       const seekRadius = predatorSeekRadius * dna.sense;
 
@@ -305,11 +308,20 @@ export function createWorld(rng) {
     const predDrain = baseDrain * 1.9;
     for (const [pid, pred] of predator.entries()) {
       const dna = pred.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
-      pred.energy -= predDrain * dna.metabolism * dt;
+
+      // Rest timer after a successful hunt
+      pred.rest = Math.max(0, (pred.rest || 0) - dt);
+
+      // Only drain energy when not resting as much
+      const restFactor = pred.rest > 0 ? 0.4 : 1.0;
+      pred.energy -= predDrain * dna.metabolism * dt * restFactor;
       if (pred.energy < 0) pred.energy = 0;
 
       const ppos = position.get(pid);
       if (!ppos) continue;
+
+      // Skip hunting if still resting from a previous kill
+      if (pred.rest > 0) continue;
 
       for (const [aid, ag] of Array.from(agent.entries())) {
         const apos = position.get(aid);
@@ -320,6 +332,8 @@ export function createWorld(rng) {
         if (d2 < predEatRadius * predEatRadius) {
           ecs.destroyEntity(aid);
           pred.energy = Math.min(3.5, pred.energy + 1.0);
+          pred.rest = 4 + rng.float() * 3; // 4–7s rest after a kill
+          break;
         }
       }
     }
