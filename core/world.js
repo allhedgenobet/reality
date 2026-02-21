@@ -3,8 +3,8 @@
 import { createEcs } from './ecs.js';
 
 export function createWorld(rng) {
-  const width = 800;
-  const height = 480;
+  const width = 1200;
+  const height = 720;
 
   const ecs = createEcs();
 
