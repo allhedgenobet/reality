@@ -202,13 +202,21 @@ export function createRenderer(canvas) {
       const radiusBase = 6 + energy * 2.5;
       const radius = age > 12 ? radiusBase * 1.15 : radiusBase;
       const dna = pred.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
-      const hue = pred.colorHue;
 
       // Map DNA traits into visual & behavioral differences
       const speedNorm = Math.max(0, Math.min(1, (dna.speed - 0.6) / 0.9));       // 0–1
       const senseNorm = Math.max(0, Math.min(1, (dna.sense - 0.6) / 0.9));       // 0–1
       const metaNorm  = Math.max(0, Math.min(1, (dna.metabolism - 0.6) / 1.0));  // 0–1
       const aggression = Math.max(0, Math.min(1, dna.speed + dna.sense - dna.metabolism));
+
+      // Derive a wider hue range from DNA: warm hunters, cooler lurkers, oddballs
+      let baseHue = 20
+        + dna.hueShift * 0.7            // inherit family tint
+        + speedNorm * 60               // fast → red/orange
+        + senseNorm * 40               // perceptive → magenta
+        - metaNorm * 30;               // high metabolism → pull back toward yellow
+      baseHue = ((baseHue % 360) + 360) % 360; // normalize
+      const hue = baseHue;
 
       const saturation = 65 + speedNorm * 30;           // fast hunters more vivid
       const lightness = 48 + (1 - metaNorm) * 10;       // low metabolism → brighter
