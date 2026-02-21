@@ -78,16 +78,31 @@ export function createRenderer(canvas) {
       const radius = 4 + Math.min(2.5, energy * 2);
 
       const evolved = ag.evolved;
-      const fillAlpha = evolved ? 1.0 : 0.95;
-      const strokeAlpha = evolved ? 1.0 : 0.9;
-      const lightness = evolved ? 72 : 65;
+      const caste = ag.caste || 'balanced';
 
-      ctx.fillStyle = `hsla(${hue}, 78%, ${lightness}%, ${fillAlpha})`;
+      let sat = 78;
+      let lightness = evolved ? 72 : 65;
+      let fillAlpha = evolved ? 1.0 : 0.95;
+      let strokeAlpha = evolved ? 1.0 : 0.9;
+      let strokeWidth = evolved ? 1.5 : 1;
+
+      // Caste-based styling tweaks
+      if (caste === 'scout') {
+        sat = 85;
+        lightness += 3;
+      } else if (caste === 'runner') {
+        sat = 92;
+      } else if (caste === 'saver') {
+        lightness -= 4;
+        fillAlpha = 0.9;
+      }
+
+      ctx.fillStyle = `hsla(${hue}, ${sat}%, ${lightness}%, ${fillAlpha})`;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = `hsla(${hue}, 95%, 40%, ${strokeAlpha})`;
-      ctx.lineWidth = evolved ? 1.5 : 1;
+      ctx.lineWidth = strokeWidth;
       ctx.stroke();
 
       // Small halo for evolved forms

@@ -57,11 +57,18 @@ export function createWorld(rng) {
     const evolvedScore = dna.speed + dna.sense + (2 - dna.metabolism);
     const evolved = evolvedScore > 3.5; // simple heuristic for "advanced" forms
 
+    // Assign a simple "caste" based on DNA traits
+    let caste = 'balanced';
+    if (dna.sense > dna.speed && dna.sense > 1.1) caste = 'scout';
+    else if (dna.speed > dna.sense && dna.speed > 1.1) caste = 'runner';
+    else if (dna.metabolism < 0.9) caste = 'saver';
+
     ecs.components.agent.set(id, {
       colorHue: baseHue + dna.hueShift,
       energy: 1.0,
       dna,
       evolved,
+      caste,
     });
     return id;
   }
