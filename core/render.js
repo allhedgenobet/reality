@@ -300,7 +300,7 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Draw apex hunters as larger hexagons behind everything
+    // Draw apex hunters as more organic, blobby shapes behind everything
     for (const [id, ap] of apex.entries()) {
       const pos = position.get(id);
       if (!pos) continue;
@@ -314,13 +314,18 @@ export function createRenderer(canvas) {
       ctx.strokeStyle = `hsla(${hue}, 95%, 35%, 0.95)`;
       ctx.lineWidth = 1.6;
 
-      const angle = (id * 0.4 + world.tick * 0.01) % (Math.PI * 2);
+      // Soft, wobbly blob instead of perfect hexagon
+      const baseAngle = (id * 0.4 + world.tick * 0.01) % (Math.PI * 2);
+      const lobes = 6;
       ctx.beginPath();
-      const sides = 6;
-      for (let i = 0; i < sides; i++) {
-        const a = angle + (i * (Math.PI * 2 / sides));
-        const x = pos.x + Math.cos(a) * radius;
-        const y = pos.y + Math.sin(a) * radius;
+      for (let i = 0; i <= lobes; i++) {
+        const t = i / lobes;
+        const a = baseAngle + t * Math.PI * 2;
+        // Wobble radius a bit to feel organic
+        const wobble = 1 + 0.18 * Math.sin(world.tick * 0.03 + id * 0.4 + i);
+        const r = radius * wobble;
+        const x = pos.x + Math.cos(a) * r;
+        const y = pos.y + Math.sin(a) * r;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
@@ -335,9 +340,9 @@ export function createRenderer(canvas) {
         const dotR = Math.max(1.4, radius * 0.13);
         ctx.fillStyle = 'rgba(255, 250, 235, 0.85)';
         for (let k = 0; k < preyCount; k++) {
-          const a = angle + (id * 0.25 + k * (Math.PI * 2 / preyCount));
-          const x = pos.x + Math.cos(a) * innerR * 0.5;
-          const y = pos.y + Math.sin(a) * innerR * 0.5;
+          const theta = baseAngle + (id * 0.25 + k * (Math.PI * 2 / preyCount));
+          const x = pos.x + Math.cos(theta) * innerR * 0.5;
+          const y = pos.y + Math.sin(theta) * innerR * 0.5;
           ctx.beginPath();
           ctx.arc(x, y, dotR, 0, Math.PI * 2);
           ctx.fill();
