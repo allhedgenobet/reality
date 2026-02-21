@@ -45,33 +45,33 @@ export function createRenderer(canvas) {
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Draw resources with 10 growth stages (smooth size + color change)
+    // Draw resources with continuous 10-stage growth (size + color change)
     for (const [id, res] of resource.entries()) {
       const pos = position.get(id);
       if (!pos) continue;
       const age = res.age ?? 0;
 
-      // Map age into 10 stages
-      const stageLen = 3; // seconds per stage
-      let stage = Math.floor(age / stageLen);
-      if (stage > 9) stage = 9;
+      // Map age into a 0–1 growth phase, conceptually split into 10 stages
+      const maxAge = 3 * 9; // 9 intervals of 3s ≈ 27s to "fully mature"
+      const phase = Math.max(0, Math.min(1, age / maxAge));
+      const stage = Math.floor(phase * 9); // 0–9 for discrete styling when needed
 
       // Growth factor: starts small, grows smoothly toward full size
-      const growthFactor = 0.5 + (stage / 9) * 0.7; // 0.5 → 1.2
+      const growthFactor = 0.5 + phase * 0.7; // 0.5 → 1.2
 
       // Base radius from how eaten it is, then scaled by growth
       const baseRadius = 2 + res.amount * 3;
       const radius = baseRadius * growthFactor;
 
-      // Color shifts slightly with stage and kind
+      // Color shifts smoothly with phase and kind
       const isPod = res.kind === 'pod';
       const baseG = isPod ? 210 : 220;
       const baseB = isPod ? 200 : 160;
       const baseR = isPod ? 150 : 130;
-      const shade = baseR - stage * 2; // subtle darkening
-      const g = baseG - stage * 1.5;
-      const b = baseB - stage;
-      const alpha = 0.75 + (stage / 9) * 0.15;
+      const shade = baseR - phase * 18; // subtle darkening over full phase
+      const g = baseG - phase * 13.5;
+      const b = baseB - phase * 9;
+      const alpha = 0.75 + phase * 0.15;
       const color = `rgba(${shade}, ${g}, ${b}, ${alpha})`;
 
       // Core patch
@@ -89,11 +89,11 @@ export function createRenderer(canvas) {
         ctx.stroke();
       }
 
-      // Circuitboard-style branches: mature stages sprout orthogonal traces
-      if (stage >= 5) {
+      // Circuitboard-style branches: later growth phases sprout orthogonal traces
+      if (phase >= 0.5) {
         const arms = 3 + (id % 3); // 3–5 arms based on id
         const t = world.tick * 0.01;
-        const baseLen = radius * (1.1 + stage / 15);
+        const baseLen = radius * (1.1 + phase * 0.6);
 
         ctx.strokeStyle = `rgba(${shade}, ${g}, ${b}, 0.45)`;
         ctx.lineWidth = 0.7;
