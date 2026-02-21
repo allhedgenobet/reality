@@ -24,7 +24,7 @@ export function createWorld(rng) {
 
   // Spawn some initial agents and resources
   const AGENT_COUNT = 18;
-  const RESOURCE_COUNT = 35;
+  const RESOURCE_COUNT = 70;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -211,10 +211,10 @@ export function createWorld(rng) {
     const fertility = world.globals.fertility;
     for (const res of resource.values()) {
       if (res.amount > 0.99) continue;
-      res.regenTimer -= dt * (0.6 + fertility * 0.8);
+      res.regenTimer -= dt * (0.8 + fertility * 1.2);
       if (res.regenTimer <= 0) {
         res.amount = 1;
-        res.regenTimer = 8 + Math.random() * 6; // slow, staggered regrowth
+        res.regenTimer = 6 + Math.random() * 4; // slightly faster, staggered regrowth
       }
     }
   }
