@@ -114,9 +114,6 @@ button:not(:disabled):active {
 
 .main-panel {
   margin-top: 1.5rem;
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(260px, 1fr);
-  gap: 1.25rem;
 }
 
 #world {
@@ -173,9 +170,6 @@ footer {
   .controls {
     grid-template-columns: 1fr;
     row-gap: 0.5rem;
-  }
-  .main-panel {
-    grid-template-columns: minmax(0, 1fr);
   }
   #world {
     height: 360px;

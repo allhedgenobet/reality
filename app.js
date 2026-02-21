@@ -1,7 +1,6 @@
 import { createRng } from './core/rng.js';
 import { createWorld } from './core/world.js';
 import { createRenderer } from './core/render.js';
-import { createInspector } from './core/inspector.js';
 
 const FIXED_DT = 0.06; // 60 ms in seconds, fixed sim step
 
@@ -9,7 +8,6 @@ let seed = null;
 let rng = null;
 let world = null;
 let renderer = null;
-let inspector = null;
 
 let running = false;
 let accumulator = 0;
@@ -85,7 +83,6 @@ function init() {
   world = createWorld(rng);
   const canvas = document.getElementById('world');
   renderer = createRenderer(canvas);
-  inspector = createInspector(world);
 
   updateLabels();
 
@@ -100,14 +97,17 @@ function init() {
   pauseBtn.addEventListener('click', pause);
   stepBtn.addEventListener('click', stepOnce);
 
+  // Spawn at random positions so it's obvious something happened
   spawnAgentBtn.addEventListener('click', () => {
-    const pos = { x: world.width * 0.5, y: world.height * 0.5 };
-    world.spawnAgent?.(pos);
+    if (!world.makeAgentAt) return;
+    world.makeAgentAt(Math.random() * world.width, Math.random() * world.height);
+    renderer.render(world);
   });
 
   spawnResourceBtn.addEventListener('click', () => {
-    const pos = { x: world.width * 0.5, y: world.height * 0.5 };
-    world.spawnResource?.(pos);
+    if (!world.makeResourceAt) return;
+    world.makeResourceAt(Math.random() * world.width, Math.random() * world.height);
+    renderer.render(world);
   });
 
   forceBrushBtn.addEventListener('click', () => {
@@ -161,43 +161,13 @@ function init() {
   });
 
   // Entity click for inspector (mouse only; touch uses tap when brush off)
-  canvas.addEventListener('click', (evt) => {
-    if (brushActive) return; // brush mode ignores click select
-    const p = worldToCanvas(evt, canvas, world);
-    world.inspectAt?.(p);
-  });
+  // No inspector clicks for now; clicks are reserved for future tools
 
-  canvas.addEventListener('touchstart', (evt) => {
-    if (brushActive) return; // in brush mode, touch handled above
-    const t = evt.touches[0];
-    if (!t) return;
-    // Treat quick single touch as selection
-    const p = worldToCanvas({ clientX: t.clientX, clientY: t.clientY }, canvas, world);
-    world.inspectAt?.(p);
-  }, { passive: true });
+  // Initial render (paused)
+  renderer.render(world);
+}
 
-  // Wire world callbacks for inspector & tools
-  world.inspectAt = (p) => {
-    inspector.inspectAt(p);
-    renderer.render(world);
-  };
-  world.refreshInspector = () => inspector.refresh();
-
-  // Tool spawn helpers
-  world.spawnAgent = (pos) => {
-    if (world.makeAgentAt) {
-      world.makeAgentAt(pos.x, pos.y);
-      renderer.render(world);
-      inspector.refresh();
-    }
-  };
-  world.spawnResource = (pos) => {
-    if (world.makeResourceAt) {
-      world.makeResourceAt(pos.x, pos.y);
-      renderer.render(world);
-      inspector.refresh();
-    }
-  };
+window.addEventListener('DOMContentLoaded', init);
 
   // Initial render (paused)
   renderer.render(world);
