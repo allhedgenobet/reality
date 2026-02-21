@@ -45,12 +45,27 @@ export function createRenderer(canvas) {
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Draw resources as soft green circles
+    // Draw resources with simple growth stages
     for (const [id, res] of resource.entries()) {
       const pos = position.get(id);
       if (!pos) continue;
-      const radius = 2 + res.amount * 3;
-      ctx.fillStyle = 'rgba(130, 220, 160, 0.85)';
+      const age = res.age ?? 0;
+
+      const young = age < 4;
+      const elder = age >= 18;
+
+      let radius = 2 + res.amount * 3;
+      let color = 'rgba(130, 220, 160, 0.85)';
+
+      if (young) {
+        radius *= 0.7;
+        color = 'rgba(155, 235, 185, 0.8)';
+      } else if (elder) {
+        radius *= 1.2;
+        color = 'rgba(115, 205, 150, 0.9)';
+      }
+
+      ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
       ctx.fill();
