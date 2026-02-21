@@ -201,6 +201,64 @@ export function createWorld(rng) {
     }
   }
 
+  // Simple soft-body collisions: dynamic creatures gently push each other apart
+  function collisionSystem(dt) {
+    const { position, velocity, agent, predator, apex } = ecs.components;
+    const entities = [];
+
+    // Collect dynamic entities with an approximate radius
+    for (const [id, ag] of agent.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      const energy = ag.energy ?? 1;
+      const radius = 4 + energy * 2;
+      entities.push({ id, pos, vel, radius });
+    }
+    for (const [id, pred] of predator.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      const energy = pred.energy ?? 1.5;
+      const radius = 6 + energy * 2.5;
+      entities.push({ id, pos, vel, radius });
+    }
+    for (const [id, ap] of apex.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      const energy = ap.energy ?? 3;
+      const radius = 9 + energy * 2;
+      entities.push({ id, pos, vel, radius });
+    }
+
+    const strength = 40; // how strongly overlaps push
+
+    for (let i = 0; i < entities.length; i++) {
+      const a = entities[i];
+      for (let j = i + 1; j < entities.length; j++) {
+        const b = entities[j];
+        const dx = b.pos.x - a.pos.x;
+        const dy = b.pos.y - a.pos.y;
+        const dist2 = dx * dx + dy * dy;
+        if (dist2 <= 0) continue;
+        const minDist = a.radius + b.radius;
+        if (dist2 >= minDist * minDist) continue;
+        const dist = Math.sqrt(dist2) || 1;
+        const overlap = (minDist - dist) / minDist;
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const impulse = strength * overlap;
+
+        // Push velocities apart
+        a.vel.vx -= nx * impulse * dt;
+        a.vel.vy -= ny * impulse * dt;
+        b.vel.vx += nx * impulse * dt;
+        b.vel.vy += ny * impulse * dt;
+      }
+    }
+  }
+
   // Steering: agents seek nearest resource and gently adjust velocity.
   function steeringSystem(dt) {
     const { position, velocity, agent, predator, apex, resource } = ecs.components;
@@ -662,6 +720,7 @@ export function createWorld(rng) {
     world.tick++;
     steeringSystem(dt);
     forceFieldSystem(dt);
+    collisionSystem(dt);
     physicsSystem(dt);
     metabolismSystem(dt);
     ecologySystem(dt);
