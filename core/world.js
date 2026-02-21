@@ -26,16 +26,38 @@ export function createWorld(rng) {
   const AGENT_COUNT = 18;
   const RESOURCE_COUNT = 35;
 
-  function makeAgent(x, y, baseHue = 200) {
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function makeAgent(x, y, baseHue = 200, parentDna) {
     const id = ecs.createEntity();
     ecs.components.position.set(id, { x, y });
+
+    const dna = parentDna
+      ? {
+          speed: clamp(parentDna.speed + (rng.float() - 0.5) * 0.1, 0.6, 1.4),
+          sense: clamp(parentDna.sense + (rng.float() - 0.5) * 0.1, 0.6, 1.4),
+          metabolism: clamp(parentDna.metabolism + (rng.float() - 0.5) * 0.1, 0.6, 1.6),
+          hueShift: clamp(parentDna.hueShift + rng.int(-4, 4), -60, 60),
+        }
+      : {
+          speed: 0.8 + rng.float() * 0.4,
+          sense: 0.8 + rng.float() * 0.4,
+          metabolism: 0.8 + rng.float() * 0.4,
+          hueShift: rng.int(-40, 40),
+        };
+
+    const speed = 40 * dna.speed;
+
     ecs.components.velocity.set(id, {
-      vx: (rng.float() - 0.5) * 40,
-      vy: (rng.float() - 0.5) * 40,
+      vx: (rng.float() - 0.5) * speed,
+      vy: (rng.float() - 0.5) * speed,
     });
     ecs.components.agent.set(id, {
-      colorHue: baseHue + rng.int(-20, 20),
+      colorHue: baseHue + dna.hueShift,
       energy: 1.0,
+      dna,
     });
     return id;
   }
@@ -80,7 +102,6 @@ export function createWorld(rng) {
   // Steering: agents seek nearest resource and gently adjust velocity.
   function steeringSystem(dt) {
     const { position, velocity, agent, resource } = ecs.components;
-    const seekRadius = 140;
     const avoidRadius = 18;
 
     // Build resource positions list once per tick
@@ -96,6 +117,9 @@ export function createWorld(rng) {
       const pos = position.get(id);
       const vel = velocity.get(id);
       if (!pos || !vel) continue;
+
+      const dna = ag.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      const seekRadius = 140 * dna.sense;
 
       let target = null;
       let targetDist2 = Infinity;
@@ -115,8 +139,9 @@ export function createWorld(rng) {
         const dx = target.x - pos.x;
         const dy = target.y - pos.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const desiredVx = (dx / dist) * 40;
-        const desiredVy = (dy / dist) * 40;
+        const desiredSpeed = 40 * dna.speed;
+        const desiredVx = (dx / dist) * desiredSpeed;
+        const desiredVy = (dy / dist) * desiredSpeed;
         // Blend current velocity toward desired
         const blend = 0.8;
         vel.vx = vel.vx * blend + desiredVx * (1 - blend);
@@ -153,7 +178,8 @@ export function createWorld(rng) {
     const baseDrain = 0.03 * world.globals.metabolism; // per second, modulated by regime
 
     for (const [id, ag] of agent.entries()) {
-      ag.energy -= baseDrain * dt;
+      const dna = ag.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      ag.energy -= baseDrain * dna.metabolism * dt;
       if (ag.energy < 0) ag.energy = 0;
 
       const pos = position.get(id);
@@ -211,6 +237,7 @@ export function createWorld(rng) {
           parentPos.x + jitter(),
           parentPos.y + jitter(),
           ag.colorHue,
+          ag.dna,
         );
         const childVel = velocity.get(childId);
         childVel.vx = parentVel.vx + jitter();
