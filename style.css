@@ -171,13 +171,19 @@ footer {
 
 @media (max-width: 800px) {
   .controls {
-    flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: 1fr;
+    row-gap: 0.5rem;
   }
   .main-panel {
     grid-template-columns: minmax(0, 1fr);
   }
   #world {
     height: 360px;
+  }
+}
+
+@media (max-width: 600px) {
+  button {
+    padding: 0.5rem 1rem;
   }
 }

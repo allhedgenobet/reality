@@ -236,6 +236,7 @@ export function createWorld(rng) {
   // Apply force fields (attractors/repulsors painted by user).
   function forceFieldSystem(dt) {
     const { position, velocity, forceField } = ecs.components;
+    if (forceField.size === 0) return;
     for (const [fid, field] of forceField.entries()) {
       const fpos = position.get(fid);
       if (!fpos) continue;
@@ -290,6 +291,38 @@ export function createWorld(rng) {
     lifeCycleSystem(dt);
     regimeSystem(dt);
   }
+
+  // Paint/update force fields at a point with a given polarity.
+  world.paintForceField = (point, polarity) => {
+    const { position, forceField } = ecs.components;
+    const radius = 80;
+    const strength = polarity * 50; // positive = attract, negative = repel
+
+    // Try to reuse a nearby field instead of spamming new ones
+    let targetId = null;
+    for (const [id, field] of forceField.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      const dx = pos.x - point.x;
+      const dy = pos.y - point.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < (radius * 0.6) * (radius * 0.6)) {
+        targetId = id;
+        break;
+      }
+    }
+
+    if (targetId == null) {
+      targetId = ecs.createEntity();
+      position.set(targetId, { x: point.x, y: point.y });
+    } else {
+      const pos = position.get(targetId);
+      pos.x = point.x;
+      pos.y = point.y;
+    }
+
+    forceField.set(targetId, { strength, radius });
+  };
 
   world.step = step;
   return world;

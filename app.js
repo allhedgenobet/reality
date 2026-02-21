@@ -115,29 +115,66 @@ function init() {
     forceBrushBtn.classList.toggle('active', brushActive);
   });
 
-  // ForceField brush on canvas
+  // ForceField brush on canvas (mouse + touch)
   let drawing = false;
+
+  function brushAtClient(x, y, polarity) {
+    const p = worldToCanvas({ clientX: x, clientY: y }, canvas, world);
+    world.paintForceField?.(p, polarity);
+  }
+
   canvas.addEventListener('mousedown', (evt) => {
     if (!brushActive) return;
     drawing = true;
-    const p = worldToCanvas(evt, canvas, world);
-    world.paintForceField?.(p, evt.shiftKey ? -1 : 1);
+    brushAtClient(evt.clientX, evt.clientY, evt.shiftKey ? -1 : 1);
   });
   canvas.addEventListener('mousemove', (evt) => {
     if (!brushActive || !drawing) return;
-    const p = worldToCanvas(evt, canvas, world);
-    world.paintForceField?.(p, evt.shiftKey ? -1 : 1);
+    brushAtClient(evt.clientX, evt.clientY, evt.shiftKey ? -1 : 1);
   });
   window.addEventListener('mouseup', () => {
     drawing = false;
   });
 
-  // Entity click for inspector
+  canvas.addEventListener('touchstart', (evt) => {
+    if (!brushActive) return;
+    const t = evt.touches[0];
+    if (!t) return;
+    evt.preventDefault();
+    drawing = true;
+    // On mobile, use two-finger tap as repulsor (if more than one touch)
+    const polarity = evt.touches.length > 1 ? -1 : 1;
+    brushAtClient(t.clientX, t.clientY, polarity);
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (evt) => {
+    if (!brushActive || !drawing) return;
+    const t = evt.touches[0];
+    if (!t) return;
+    evt.preventDefault();
+    const polarity = evt.touches.length > 1 ? -1 : 1;
+    brushAtClient(t.clientX, t.clientY, polarity);
+  }, { passive: false });
+
+  window.addEventListener('touchend', () => {
+    drawing = false;
+  });
+
+  // Entity click for inspector (mouse only; touch uses tap when brush off)
   canvas.addEventListener('click', (evt) => {
     if (brushActive) return; // brush mode ignores click select
     const p = worldToCanvas(evt, canvas, world);
     world.inspectAt?.(p);
   });
+
+  canvas.addEventListener('touchstart', (evt) => {
+    if (brushActive) return; // in brush mode, touch handled above
+    const t = evt.touches[0];
+    if (!t) return;
+    // Treat quick single touch as selection
+    const p = worldToCanvas({ clientX: t.clientX, clientY: t.clientY }, canvas, world);
+    world.inspectAt?.(p);
+  }, { passive: true });
 
   // Wire world callbacks for inspector & tools
   world.inspectAt = (p) => {
