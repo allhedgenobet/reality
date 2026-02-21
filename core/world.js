@@ -582,8 +582,25 @@ export function createWorld(rng) {
       }
     }
 
-    // Apex death when fully starved
+    // Apex lifecycle: reproduce more readily than predators + death when fully starved
     for (const [id, ap] of Array.from(apex.entries())) {
+      if (ap.energy >= 3.2 && ap.age > 14) {
+        const pos = position.get(id);
+        const vel = velocity.get(id);
+        if (pos && vel) {
+          const jitter = () => (rng.float() - 0.5) * 12;
+          const childId = makeApex(
+            pos.x + jitter(),
+            pos.y + jitter(),
+            ap.dna,
+          );
+          const childVel = velocity.get(childId);
+          childVel.vx = vel.vx + jitter();
+          childVel.vy = vel.vy + jitter();
+          ap.energy *= 0.55; // keep a bit more energy post-reproduction
+        }
+      }
+
       if (ap.energy <= 0) {
         ecs.destroyEntity(id);
       }
