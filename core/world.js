@@ -566,6 +566,10 @@ export function createWorld(rng) {
             pushEntity(agent);
             pushEntity(predator);
             pushEntity(apex);
+
+            // Apex "supernova": consume itself in the burst
+            ecs.destroyEntity(aid);
+            break;
           }
 
           ap.rest = 4 + rng.float() * 2; // 4–6s rest after eating a predator
