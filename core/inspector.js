@@ -14,11 +14,12 @@ export function createInspector(world) {
     }
 
     const { ecs } = world;
-    const { position, velocity, agent, resource } = ecs.components;
+    const { position, velocity, agent, predator, resource } = ecs.components;
 
     const pos = position.get(selectedId);
     const vel = velocity.get(selectedId);
     const ag = agent.get(selectedId);
+    const pred = predator.get(selectedId);
     const res = resource.get(selectedId);
 
     panelEl.hidden = false;
@@ -37,6 +38,10 @@ export function createInspector(world) {
     if (ag) {
       fields.push({ label: 'energy', path: ['agent', 'energy'], value: ag.energy.toFixed(2) });
       fields.push({ label: 'colorHue', path: ['agent', 'colorHue'], value: ag.colorHue });
+    }
+    if (pred) {
+      fields.push({ label: 'pred.energy', path: ['predator', 'energy'], value: pred.energy.toFixed(2) });
+      fields.push({ label: 'pred.colorHue', path: ['predator', 'colorHue'], value: pred.colorHue });
     }
     if (res) {
       fields.push({ label: 'amount', path: ['resource', 'amount'], value: res.amount.toFixed(2) });
@@ -70,7 +75,7 @@ export function createInspector(world) {
 
   function inspectAt(point) {
     const { ecs } = world;
-    const { position, agent, resource } = ecs.components;
+    const { position, agent, predator, resource } = ecs.components;
     const hitRadius = 8;
 
     let closestId = null;
@@ -82,7 +87,7 @@ export function createInspector(world) {
       const dx = pos.x - point.x;
       const dy = pos.y - point.y;
       const d2 = dx * dx + dy * dy;
-      if (d2 < hitRadius * hitRadius && d2 < closestDist2 && (agent.has(id) || resource.has(id))) {
+      if (d2 < hitRadius * hitRadius && d2 < closestDist2 && (agent.has(id) || predator.has(id) || resource.has(id))) {
         closestId = id;
         closestDist2 = d2;
       }

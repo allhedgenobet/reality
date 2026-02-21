@@ -8,6 +8,7 @@ export function createEcs() {
     position: new Map(), // { x, y }
     velocity: new Map(), // { vx, vy }
     agent: new Map(),    // { colorHue, energy }
+    predator: new Map(), // { colorHue, energy }
     resource: new Map(), // { amount, regenTimer }
     forceField: new Map(), // { strength, radius }
   };

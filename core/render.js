@@ -42,7 +42,7 @@ export function createRenderer(canvas) {
       ctx.stroke();
     }
 
-    const { position, agent, resource, forceField } = ecs.components;
+    const { position, agent, predator, resource, forceField } = ecs.components;
 
     // Regime overlay
     if (world.regime === 'storm') {
@@ -72,6 +72,22 @@ export function createRenderer(canvas) {
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, field.radius, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    // Draw predators first (so agents appear on top)
+    for (const [id, pred] of predator.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      const energy = pred.energy ?? 1.5;
+      const radius = 5 + Math.min(3, energy * 2.2);
+      const hue = pred.colorHue;
+      ctx.fillStyle = `hsla(${hue}, 80%, 55%, 0.9)`;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `hsla(${hue}, 90%, 35%, 0.95)`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
     }
 
     // Draw agents as colored blobs with outline, radius maps to energy
