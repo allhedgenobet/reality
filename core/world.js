@@ -359,7 +359,7 @@ export function createWorld(rng) {
         }
         // Pod partially depletes and starts a new seed timer
         res.amount = 0.3;
-        res.age = 0;
+        // age is not reset: plants keep accumulating age across cycles
         res.seedTimer = 10 + rng.float() * 12;
       }
 
@@ -368,7 +368,7 @@ export function createWorld(rng) {
       if (res.regenTimer <= 0) {
         res.amount = 1;
         res.regenTimer = 6 + Math.random() * 4; // slightly faster, staggered regrowth
-        res.age = 0; // new growth cycle
+        // age is not reset here either, allowing infinite growth cycles
       }
     }
   }
