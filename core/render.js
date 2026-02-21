@@ -70,7 +70,6 @@ export function createRenderer(canvas) {
         ctx.beginPath();
         ctx.moveTo(x, y);
         for (let s = 0; s < segs; s++) {
-          const prog = s / Math.max(1, segs - 1);
           const jitter = Math.sin(t + id * 0.2 + s * 0.6) * amplitude;
           const dx = Math.cos(angle) * baseLen;
           const dy = Math.sin(angle) * baseLen;
@@ -83,10 +82,6 @@ export function createRenderer(canvas) {
         ctx.stroke();
         continue;
       }
-
-      const cycles = res.cycles ?? 0;
-      const age = res.age ?? 0;
-      const cycles = res.cycles ?? 0;
 
       // Map age into a 0–1 growth phase for color/branch timing within a cycle
       const maxAge = 3 * 9; // reference scale ≈ 27s
