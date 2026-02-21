@@ -75,7 +75,15 @@ export function createRenderer(canvas) {
       if (!pos) continue;
       const hue = ag.colorHue;
       const energy = ag.energy ?? 1;
-      const radius = 4 + Math.min(2.5, energy * 2);
+      const age = ag.age ?? 0;
+
+      const young = age < 6;           // newly spawned
+      const mature = age >= 6 && age < 20;
+      const elder = age >= 20;
+
+      let radius = 4 + Math.min(2.5, energy * 2);
+      if (young) radius *= 0.75;
+      else if (elder) radius *= 1.15;
 
       const evolved = ag.evolved;
       const caste = ag.caste || 'balanced';
@@ -85,6 +93,13 @@ export function createRenderer(canvas) {
       let fillAlpha = evolved ? 1.0 : 0.95;
       let strokeAlpha = evolved ? 1.0 : 0.9;
       let strokeWidth = evolved ? 1.5 : 1;
+
+      if (young) {
+        lightness += 4;
+        fillAlpha = 0.9;
+      } else if (elder) {
+        lightness -= 3;
+      }
 
       // Caste-based styling tweaks
       if (caste === 'scout') {

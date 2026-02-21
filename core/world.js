@@ -66,6 +66,7 @@ export function createWorld(rng) {
     ecs.components.agent.set(id, {
       colorHue: baseHue + dna.hueShift,
       energy: 1.0,
+      age: 0,
       dna,
       evolved,
       caste,
@@ -226,19 +227,22 @@ export function createWorld(rng) {
     }
   }
 
-  // Reproduction & death.
+  // Reproduction & growth.
   function lifeCycleSystem(dt) {
     const { position, velocity, agent } = ecs.components;
 
     // Herbivore lifecycle
     for (const [id, ag] of Array.from(agent.entries())) {
+      // Age grows slowly over time
+      ag.age = (ag.age || 0) + dt;
+
       // Clamp energy at zero but do not kill agents
       if (ag.energy <= 0) {
         ag.energy = 0;
       }
 
       // Reproduction
-      if (ag.energy >= world.globals.reproductionThreshold) {
+      if (ag.energy >= world.globals.reproductionThreshold && ag.age > 8) {
         const parentPos = position.get(id);
         const parentVel = velocity.get(id);
         if (!parentPos || !parentVel) continue;
