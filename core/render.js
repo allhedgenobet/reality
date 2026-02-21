@@ -93,7 +93,6 @@ export function createRenderer(canvas) {
 
       // Circuitboard-style branches: later growth phases sprout orthogonal traces
       if (phase >= 0.5) {
-        const arms = 3 + (id % 3); // 3–5 arms based on id
         const baseLen = radius * (0.8 + phase * 0.7);
 
         ctx.strokeStyle = `rgba(${shade}, ${g}, ${b}, 0.45)`;
@@ -106,8 +105,17 @@ export function createRenderer(canvas) {
           { x: 0, y: -1 },
         ];
 
+        // Number of arms increases slowly with age (more branches over time)
+        const baseArms = 2 + (id % 2); // 2–3
+        const extraArms = Math.min(5, Math.floor(age / 25)); // +1 arm every ~25s, up to +5
+        const arms = baseArms + extraArms;
+
         for (let i = 0; i < arms; i++) {
-          const steps = 2 + ((id + i) % 3); // 2–4 segments
+          // Steps per arm also increase with age
+          const baseSteps = 2 + ((id + i) % 2); // 2–3
+          const extraSteps = Math.min(3, Math.floor(age / 30)); // up to +3 segments over time
+          const steps = baseSteps + extraSteps;
+
           let cx = pos.x;
           let cy = pos.y;
 
