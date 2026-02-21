@@ -195,10 +195,9 @@ export function createWorld(rng) {
 
     // Herbivore lifecycle
     for (const [id, ag] of Array.from(agent.entries())) {
-      // Death
+      // Clamp energy at zero but do not kill agents
       if (ag.energy <= 0) {
-        ecs.destroyEntity(id);
-        continue;
+        ag.energy = 0;
       }
 
       // Reproduction
