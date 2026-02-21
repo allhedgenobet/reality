@@ -290,7 +290,7 @@ export function createRenderer(canvas) {
         const dotR = Math.max(1.2, radius * 0.12);
         ctx.fillStyle = 'rgba(255, 245, 230, 0.8)';
         for (let k = 0; k < preyCount; k++) {
-          const a = angle + (id * 0.3 + k * (Math.PI * 2 / preyCount));
+          const a = facing + (id * 0.3 + k * (Math.PI * 2 / preyCount));
           const x = pos.x + Math.cos(a) * innerR * 0.6;
           const y = pos.y + Math.sin(a) * innerR * 0.6;
           ctx.beginPath();
