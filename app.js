@@ -92,6 +92,8 @@ function init() {
   const spawnAgentBtn = document.getElementById('spawnAgentButton');
   const spawnResourceBtn = document.getElementById('spawnResourceButton');
   const forceBrushBtn = document.getElementById('forceBrushButton');
+  const zoomInBtn = document.getElementById('zoomInButton');
+  const zoomOutBtn = document.getElementById('zoomOutButton');
 
   startBtn.addEventListener('click', start);
   pauseBtn.addEventListener('click', pause);

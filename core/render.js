@@ -39,6 +39,13 @@ export function createRenderer(canvas) {
 
     const { position, agent, predator, apex, burst, resource, forceField } = ecs.components;
 
+    // Camera transform (zoom + pan around world.camera.x/y)
+    const cam = world.camera || { zoom: 1, x: width * 0.5, y: height * 0.5 };
+    ctx.save();
+    ctx.translate(width * 0.5, height * 0.5);
+    ctx.scale(cam.zoom, cam.zoom);
+    ctx.translate(-cam.x, -cam.y);
+
     // Regime overlay
     if (world.regime === 'storm') {
       ctx.fillStyle = 'rgba(180, 80, 160, 0.05)';
@@ -326,7 +333,12 @@ export function createRenderer(canvas) {
       }
     }
 
+    // Restore world transform before HUD/overlays (none yet)
+    ctx.restore();
+
     // Draw agents as colored blobs with outline, radius maps to energy
+    // (Agents are still drawn in world coordinates; if we want them to respect camera,
+    // we could move them before ctx.restore(). For now they float as a HUD-ish overlay.)
     for (const [id, ag] of agent.entries()) {
       const pos = position.get(id);
       if (!pos) continue;

@@ -14,6 +14,11 @@ export function createWorld(rng) {
     height,
     ecs,
     regime: 'calm',
+    camera: {
+      zoom: 1,
+      x: width * 0.5,
+      y: height * 0.5,
+    },
     globals: {
       fertility: 0.6,
       metabolism: 1.0,
