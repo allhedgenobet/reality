@@ -310,13 +310,8 @@ export function createWorld(rng) {
       }
     }
 
-    // Cap population to avoid catastrophic explosions: gently throttle reproduction instead of killing
-    const maxAgents = 160;
-    if (agent.size > maxAgents) {
-      world.globals.reproductionThreshold = 2.4; // temporarily raise threshold
-    } else if (agent.size < 120) {
-      world.globals.reproductionThreshold = 1.6; // normal
-    }
+    // No hard population cap: reproductionThreshold stays constant
+    world.globals.reproductionThreshold = 1.6;
   }
 
   // Apply force fields (attractors/repulsors painted by user).
