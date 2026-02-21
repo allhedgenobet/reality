@@ -45,23 +45,32 @@ export function createRenderer(canvas) {
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Draw resources with simple growth stages (color only; size tracks amount)
+    // Draw resources with 10 growth stages (smooth size + color change)
     for (const [id, res] of resource.entries()) {
       const pos = position.get(id);
       if (!pos) continue;
       const age = res.age ?? 0;
 
-      const young = age < 4;
-      const elder = age >= 18;
+      // Map age into 10 stages
+      const stageLen = 3; // seconds per stage
+      let stage = Math.floor(age / stageLen);
+      if (stage > 9) stage = 9;
 
-      const radius = 2 + res.amount * 3; // size only reflects how eaten it is
-      let color = 'rgba(130, 220, 160, 0.85)';
+      // Growth factor: starts small, grows smoothly toward full size
+      const growthFactor = 0.5 + (stage / 9) * 0.7; // 0.5 → 1.2
 
-      if (young) {
-        color = 'rgba(155, 235, 185, 0.8)';
-      } else if (elder) {
-        color = 'rgba(115, 205, 150, 0.9)';
-      }
+      // Base radius from how eaten it is, then scaled by growth
+      const baseRadius = 2 + res.amount * 3;
+      const radius = baseRadius * growthFactor;
+
+      // Color shifts slightly with stage
+      const baseG = 220;
+      const baseB = 160;
+      const shade = 130 - stage * 2; // subtle darkening
+      const g = baseG - stage * 1.5;
+      const b = baseB - stage;
+      const alpha = 0.75 + (stage / 9) * 0.15;
+      const color = `rgba(${shade}, ${g}, ${b}, ${alpha})`;
 
       ctx.fillStyle = color;
       ctx.beginPath();
