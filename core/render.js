@@ -255,15 +255,27 @@ export function createRenderer(canvas) {
       // Shape variation: more aggressive → narrower, longer triangles
       const aspect = 0.7 + aggression * 0.6; // 0.7 (stubby) – 1.3 (narrow)
 
-      // Draw a rotated triangle (spin rate tied to speed & aggression)
-      const baseSpin = 0.012 + speedNorm * 0.018 + aggression * 0.01;
-      const angle = (id * 0.7 + world.tick * baseSpin) % (Math.PI * 2);
+      // Determine facing from velocity: short side (base) leads the motion
+      const vel = ecs.components.velocity.get(id);
+      const hasVel = vel && (Math.abs(vel.vx) + Math.abs(vel.vy) > 0.5);
+      const facing = hasVel ? Math.atan2(vel.vy, vel.vx) : (id * 0.7 + world.tick * 0.01);
+
       ctx.beginPath();
       for (let i = 0; i < 3; i++) {
-        const a = angle + (i * (Math.PI * 2 / 3));
-        const dir = (i === 0) ? 1.0 * aspect : 0.7 / aspect;
-        const x = pos.x + Math.cos(a) * radius * dir;
-        const y = pos.y + Math.sin(a) * radius * dir;
+        let a;
+        let rScale;
+        if (i === 0) {
+          // Rear tip, pointing opposite to motion
+          a = facing + Math.PI;
+          rScale = 1.1 * aspect;
+        } else {
+          // Leading edge: short side centered on facing direction
+          const sideOffset = i === 1 ? -0.4 : 0.4;
+          a = facing + sideOffset;
+          rScale = 0.7 / aspect;
+        }
+        const x = pos.x + Math.cos(a) * radius * rScale;
+        const y = pos.y + Math.sin(a) * radius * rScale;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
