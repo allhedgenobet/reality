@@ -24,7 +24,6 @@ export function createWorld(rng) {
 
   // Spawn some initial agents and resources
   const AGENT_COUNT = 18;
-  const PREDATOR_COUNT = 4;
   const RESOURCE_COUNT = 35;
 
   function makeAgent(x, y, baseHue = 200) {
@@ -41,20 +40,6 @@ export function createWorld(rng) {
     return id;
   }
 
-  function makePredator(x, y) {
-    const id = ecs.createEntity();
-    ecs.components.position.set(id, { x, y });
-    ecs.components.velocity.set(id, {
-      vx: (rng.float() - 0.5) * 55,
-      vy: (rng.float() - 0.5) * 55,
-    });
-    ecs.components.predator.set(id, {
-      colorHue: 10 + rng.int(-10, 10),
-      energy: 1.5,
-    });
-    return id;
-  }
-
   function makeResource(x, y) {
     const id = ecs.createEntity();
     ecs.components.position.set(id, { x, y });
@@ -67,10 +52,6 @@ export function createWorld(rng) {
 
   for (let i = 0; i < AGENT_COUNT; i++) {
     makeAgent(rng.float() * width, rng.float() * height);
-  }
-
-  for (let i = 0; i < PREDATOR_COUNT; i++) {
-    makePredator(rng.float() * width, rng.float() * height);
   }
 
   for (let i = 0; i < RESOURCE_COUNT; i++) {
@@ -98,7 +79,7 @@ export function createWorld(rng) {
 
   // Steering: agents seek nearest resource and gently adjust velocity.
   function steeringSystem(dt) {
-    const { position, velocity, agent, predator, resource } = ecs.components;
+    const { position, velocity, agent, resource } = ecs.components;
     const seekRadius = 140;
     const avoidRadius = 18;
 
@@ -163,47 +144,14 @@ export function createWorld(rng) {
       vel.vy += ay * dt;
     }
 
-    // Predators seek nearest agents
-    const predatorSeekRadius = 180;
-    for (const [id, pred] of predator.entries()) {
-      const pos = position.get(id);
-      const vel = velocity.get(id);
-      if (!pos || !vel) continue;
-
-      let target = null;
-      let targetDist2 = Infinity;
-      for (const [aid] of agent.entries()) {
-        const apos = position.get(aid);
-        if (!apos) continue;
-        const dx = apos.x - pos.x;
-        const dy = apos.y - pos.y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < targetDist2 && d2 < predatorSeekRadius * predatorSeekRadius) {
-          targetDist2 = d2;
-          target = apos;
-        }
-      }
-
-      if (target) {
-        const dx = target.x - pos.x;
-        const dy = target.y - pos.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const desiredVx = (dx / dist) * 55;
-        const desiredVy = (dy / dist) * 55;
-        const blend = 0.75;
-        vel.vx = vel.vx * blend + desiredVx * (1 - blend);
-        vel.vy = vel.vy * blend + desiredVy * (1 - blend);
-      }
-    }
   }
 
   // Metabolism & eating: agents lose energy over time, gain by consuming resources.
   function metabolismSystem(dt) {
-    const { position, agent, predator, resource } = ecs.components;
+    const { position, agent, resource } = ecs.components;
     const eatRadius = 10;
     const baseDrain = 0.03 * world.globals.metabolism; // per second, modulated by regime
 
-    // Herbivores
     for (const [id, ag] of agent.entries()) {
       ag.energy -= baseDrain * dt;
       if (ag.energy < 0) ag.energy = 0;
@@ -243,7 +191,7 @@ export function createWorld(rng) {
 
   // Reproduction & death.
   function lifeCycleSystem(dt) {
-    const { position, velocity, agent, predator } = ecs.components;
+    const { position, velocity, agent } = ecs.components;
 
     // Herbivore lifecycle
     for (const [id, ag] of Array.from(agent.entries())) {
@@ -272,13 +220,6 @@ export function createWorld(rng) {
         childAgent.energy = ag.energy * 0.5;
 
         ag.energy *= 0.5;
-      }
-    }
-
-    // Predator death
-    for (const [id, pred] of Array.from(predator.entries())) {
-      if (pred.energy <= 0) {
-        ecs.destroyEntity(id);
       }
     }
 
