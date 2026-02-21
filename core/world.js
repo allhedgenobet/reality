@@ -344,12 +344,28 @@ export function createWorld(rng) {
     const { resource, position } = ecs.components;
     const fertility = world.globals.fertility;
 
+    // Global pod count for limiting explosive growth
+    let podCount = 0;
+    for (const res of resource.values()) {
+      if (res.kind === 'pod') podCount++;
+    }
+
+    const MAX_PODS = 80;          // soft global cap
+    const MAX_POD_CYCLES = 3;     // per-pod explosion limit
+
     for (const [id, res] of resource.entries()) {
       // Age tracks time since last regrowth
       res.age = (res.age || 0) + dt;
 
-      // Seed pod explosion: when mature and still fairly full
-      if (res.kind === 'pod' && res.seedTimer != null && res.age > res.seedTimer && res.amount > 0.6) {
+      // Seed pod explosion: when mature and still fairly full, within limits
+      if (
+        res.kind === 'pod' &&
+        res.seedTimer != null &&
+        res.age > res.seedTimer &&
+        res.amount > 0.6 &&
+        (res.cycles || 0) < MAX_POD_CYCLES &&
+        podCount < MAX_PODS
+      ) {
         const pos = position.get(id);
         if (pos) {
           const seeds = 4 + (id % 4); // 4–7 new plants
@@ -377,6 +393,7 @@ export function createWorld(rng) {
         res.cycles = (res.cycles || 0) + 1;
         res.age = 0; // reset per-cycle animation
         res.seedTimer = 10 + rng.float() * 12;
+        podCount++; // track new pod
       }
 
       if (res.amount > 0.99) continue;
