@@ -321,6 +321,9 @@ export function createWorld(rng) {
       // Resting apex drift but do not aggressively seek
       if (ap.rest && ap.rest > 0) continue;
 
+      const dna = ap.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      const seekRadius = apexSeekRadius * dna.sense;
+
       let target = null;
       let targetDist2 = Infinity;
       for (const [pid] of predator.entries()) {
@@ -329,7 +332,7 @@ export function createWorld(rng) {
         const dx = ppos.x - pos.x;
         const dy = ppos.y - pos.y;
         const d2 = dx * dx + dy * dy;
-        if (d2 < targetDist2 && d2 < apexSeekRadius * apexSeekRadius) {
+        if (d2 < targetDist2 && d2 < seekRadius * seekRadius) {
           targetDist2 = d2;
           target = ppos;
         }
@@ -339,7 +342,7 @@ export function createWorld(rng) {
         const dx = target.x - pos.x;
         const dy = target.y - pos.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const desiredSpeed = 40; // slower, deliberate
+        const desiredSpeed = 40 * dna.speed; // slower baseline, scaled by DNA
         const desiredVx = (dx / dist) * desiredSpeed;
         const desiredVy = (dy / dist) * desiredSpeed;
         const blend = 0.85;
