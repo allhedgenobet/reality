@@ -1,3 +1,4 @@
+ecosystem simulation
 # Reality Sandbox (Browser)
 
 A deterministic 2D ecosystem/economy sandbox running entirely in the browser. This is the starting scaffold (M1): seeded RNG, fixed-timestep tick loop, and canvas rendering.
