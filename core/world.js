@@ -427,17 +427,24 @@ export function createWorld(rng) {
     }
 
     const strength = 40; // how strongly overlaps push
+    const maxRadius = 20;
+    const collisionGrid = buildSpatialIndex(entities, maxRadius);
 
     for (let i = 0; i < entities.length; i++) {
       const a = entities[i];
-      for (let j = i + 1; j < entities.length; j++) {
-        const b = entities[j];
+      const nearby = querySpatial(collisionGrid, a.pos.x, a.pos.y, a.radius + maxRadius);
+
+      for (const b of nearby) {
+        if (b.id <= a.id) continue; // process each pair once
+
         const dx = b.pos.x - a.pos.x;
         const dy = b.pos.y - a.pos.y;
         const dist2 = dx * dx + dy * dy;
         if (dist2 <= 0) continue;
+
         const minDist = a.radius + b.radius;
         if (dist2 >= minDist * minDist) continue;
+
         const dist = Math.sqrt(dist2) || 1;
         const overlap = (minDist - dist) / minDist;
         const nx = dx / dist;
