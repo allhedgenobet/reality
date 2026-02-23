@@ -3,9 +3,9 @@ import { createWorld } from './core/world.js';
 import { createRenderer } from './core/render.js';
 
 // --- Seed & world setup ---
-const seedStr = String(Date.now());
-const rng = createRng(seedStr);
-const world = createWorld(rng);
+let seedStr = String(Date.now());
+let rng = createRng(seedStr);
+let world = createWorld(rng);
 const canvas = document.getElementById('world');
 const renderer = createRenderer(canvas);
 
@@ -24,6 +24,20 @@ const seedValue = document.getElementById('seedValue');
 
 seedValue.textContent = seedStr;
 
+function isExtinct(currentWorld) {
+  const { agent, predator, apex, coral } = currentWorld.ecs.components;
+  return agent.size === 0 && predator.size === 0 && apex.size === 0 && coral.size === 0;
+}
+
+function resetWorld() {
+  seedStr = String(Date.now());
+  rng = createRng(seedStr);
+  world = createWorld(rng);
+  seedValue.textContent = seedStr;
+  tickLabel.textContent = `Tick: ${world.tick}`;
+  renderer.render(world);
+}
+
 // --- Fixed-timestep loop ---
 const DT = 0.06;
 const MS_PER_TICK = DT * 1000;
@@ -40,6 +54,11 @@ function loop(now) {
   while (accum >= MS_PER_TICK) {
     world.step(DT);
     accum -= MS_PER_TICK;
+    if (isExtinct(world)) {
+      resetWorld();
+      accum = 0;
+      break;
+    }
   }
   tickLabel.textContent = `Tick: ${world.tick}`;
   renderer.render(world);
@@ -68,6 +87,10 @@ function pause() {
 function step() {
   if (running) return;
   world.step(DT);
+  if (isExtinct(world)) {
+    resetWorld();
+    return;
+  }
   tickLabel.textContent = `Tick: ${world.tick}`;
   renderer.render(world);
 }
