@@ -63,9 +63,9 @@ export function createRenderer(canvas) {
     // Camera transform (zoom + pan around world.camera.x/y)
     // Use canvas CSS dimensions so the camera center maps to the canvas center.
     const cam = world.camera || { zoom: 1, x: width * 0.5, y: height * 0.5 };
-    // On first render, fit the whole world into the canvas.
+    // On first render, fill the canvas with world space (no letterboxing).
     if (!initialFitApplied) {
-      cam.zoom = Math.min(canvasW / width, canvasH / height);
+      cam.zoom = Math.max(canvasW / width, canvasH / height);
       initialFitApplied = true;
     }
     ctx.save();

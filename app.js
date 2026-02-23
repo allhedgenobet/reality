@@ -82,7 +82,11 @@ canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   const delta = Math.sign(e.deltaY);
   const step = 0.1;
-  const min = 0.3;
+  const fitMin = Math.max(
+    canvas.clientWidth / world.width,
+    canvas.clientHeight / world.height,
+  );
+  const min = Math.max(0.3, fitMin);
   const max = 4;
   world.camera.zoom = Math.max(min, Math.min(max, world.camera.zoom - delta * step));
   if (!running) renderer.render(world);
