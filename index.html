@@ -33,6 +33,31 @@
       </div>
     </section>
 
+    <section class="hud" aria-label="World stats">
+      <span>Agents: <strong id="countAgents">0</strong></span>
+      <span>Predators: <strong id="countPredators">0</strong></span>
+      <span>Apex: <strong id="countApex">0</strong></span>
+      <span>Coral: <strong id="countCoral">0</strong></span>
+      <span>Resources: <strong id="countResources">0</strong></span>
+    </section>
+
+    <section class="settings" aria-label="Simulation settings">
+      <label class="setting-item checkbox">
+        <input type="checkbox" id="autoRebirthToggle" checked />
+        <span>Auto-rebirth</span>
+      </label>
+      <label class="setting-item">
+        <span>Population cap</span>
+        <input type="range" id="populationCapRange" min="20" max="400" step="10" value="220" />
+        <output id="populationCapValue" for="populationCapRange">220</output>
+      </label>
+      <label class="setting-item">
+        <span>Chaos level</span>
+        <input type="range" id="chaosLevelRange" min="0" max="100" step="1" value="35" />
+        <output id="chaosLevelValue" for="chaosLevelRange">35%</output>
+      </label>
+    </section>
+
     <section class="main-panel">
       <canvas id="world" aria-label="Reality Sandbox world"></canvas>
     </section>

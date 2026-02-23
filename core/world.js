@@ -24,6 +24,8 @@ export function createWorld(rng) {
       metabolism: 1.0,
       storminess: 0.0,
       reproductionThreshold: 1.6,
+      populationCap: 220,
+      chaosLevel: 0.35,
     },
   };
 
@@ -862,6 +864,9 @@ export function createWorld(rng) {
   function lifeCycleSystem(dt) {
     const { position, velocity, agent, predator, apex, coral, burst } = ecs.components;
 
+    const totalCreatures = () => agent.size + predator.size + apex.size + coral.size;
+    const canReproduce = () => totalCreatures() < world.globals.populationCap;
+
     // Herbivore lifecycle
     for (const [id, ag] of Array.from(agent.entries())) {
       // Age grows slowly over time
@@ -873,7 +878,7 @@ export function createWorld(rng) {
       }
 
       // Reproduction
-      if (ag.energy >= world.globals.reproductionThreshold && ag.age > 8) {
+      if (ag.energy >= world.globals.reproductionThreshold && ag.age > 8 && canReproduce()) {
         const parentPos = position.get(id);
         const parentVel = velocity.get(id);
         if (!parentPos || !parentVel) continue;
@@ -899,7 +904,7 @@ export function createWorld(rng) {
     for (const [pid, pred] of Array.from(predator.entries())) {
       pred.age = (pred.age || 0) + dt;
 
-      if (pred.energy >= 2.8 && pred.age > 10) {
+      if (pred.energy >= 2.8 && pred.age > 10 && canReproduce()) {
         const pos = position.get(pid);
         const vel = velocity.get(pid);
         if (pos && vel) {
@@ -923,7 +928,7 @@ export function createWorld(rng) {
 
     // Apex lifecycle: reproduce more readily than predators + death when fully starved
     for (const [id, ap] of Array.from(apex.entries())) {
-      if (ap.energy >= 3.2 && ap.age > 14) {
+      if (ap.energy >= 3.2 && ap.age > 14 && canReproduce()) {
         const pos = position.get(id);
         const vel = velocity.get(id);
         if (pos && vel) {
@@ -947,7 +952,7 @@ export function createWorld(rng) {
 
     // Coral lifecycle: reproduce + death when starved
     for (const [id, cr] of Array.from(coral.entries())) {
-      if (cr.energy >= 2.5 && cr.age > 12) {
+      if (cr.energy >= 2.5 && cr.age > 12 && canReproduce()) {
         const pos = position.get(id);
         const vel = velocity.get(id);
         if (pos && vel) {
@@ -977,8 +982,8 @@ export function createWorld(rng) {
       }
     }
 
-    // No hard population cap: reproductionThreshold stays constant
-    world.globals.reproductionThreshold = 1.6;
+    // Dynamic baseline threshold with chaos influence (higher chaos => slightly easier breeding)
+    world.globals.reproductionThreshold = 1.6 - world.globals.chaosLevel * 0.15;
   }
 
   // Apply force fields (attractors/repulsors painted by user).
@@ -1018,14 +1023,15 @@ export function createWorld(rng) {
     // Simple heuristic: low resources + high population increases storminess.
     const scarcity = avgRes < 0.5 ? (0.5 - avgRes) * 2 : 0;
     const pressure = pop / 80;
-    const targetStorm = Math.max(0, Math.min(1, scarcity * 0.7 + pressure * 0.3));
+    const chaosBias = world.globals.chaosLevel * 0.45;
+    const targetStorm = Math.max(0, Math.min(1, scarcity * 0.6 + pressure * 0.25 + chaosBias));
 
     // Smooth toward target.
     world.globals.storminess += (targetStorm - world.globals.storminess) * 0.05;
 
     // Map storminess to metabolism and regime label.
     const s = world.globals.storminess;
-    world.globals.metabolism = 1 + s * 1.5; // faster drain in storm
+    world.globals.metabolism = 1 + s * 1.5 + world.globals.chaosLevel * 0.25; // faster drain with chaos/storm
     world.regime = s > 0.55 ? 'storm' : 'calm';
   }
 

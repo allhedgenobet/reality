@@ -21,8 +21,34 @@ const zoomInButton = document.getElementById('zoomInButton');
 const zoomOutButton = document.getElementById('zoomOutButton');
 const tickLabel = document.getElementById('tickLabel');
 const seedValue = document.getElementById('seedValue');
+const countAgents = document.getElementById('countAgents');
+const countPredators = document.getElementById('countPredators');
+const countApex = document.getElementById('countApex');
+const countCoral = document.getElementById('countCoral');
+const countResources = document.getElementById('countResources');
+const autoRebirthToggle = document.getElementById('autoRebirthToggle');
+const populationCapRange = document.getElementById('populationCapRange');
+const populationCapValue = document.getElementById('populationCapValue');
+const chaosLevelRange = document.getElementById('chaosLevelRange');
+const chaosLevelValue = document.getElementById('chaosLevelValue');
 
 seedValue.textContent = seedStr;
+
+function updateHud() {
+  const { agent, predator, apex, coral, resource } = world.ecs.components;
+  countAgents.textContent = agent.size;
+  countPredators.textContent = predator.size;
+  countApex.textContent = apex.size;
+  countCoral.textContent = coral.size;
+  countResources.textContent = resource.size;
+}
+
+function applySettingsToWorld() {
+  world.globals.populationCap = Number(populationCapRange.value);
+  world.globals.chaosLevel = Number(chaosLevelRange.value) / 100;
+  populationCapValue.value = String(world.globals.populationCap);
+  chaosLevelValue.value = `${Math.round(world.globals.chaosLevel * 100)}%`;
+}
 
 function isExtinct(currentWorld) {
   const { agent, predator, apex, coral } = currentWorld.ecs.components;
@@ -33,8 +59,10 @@ function resetWorld() {
   seedStr = String(Date.now());
   rng = createRng(seedStr);
   world = createWorld(rng);
+  applySettingsToWorld();
   seedValue.textContent = seedStr;
   tickLabel.textContent = `Tick: ${world.tick}`;
+  updateHud();
   renderer.render(world);
 }
 
@@ -54,13 +82,14 @@ function loop(now) {
   while (accum >= MS_PER_TICK) {
     world.step(DT);
     accum -= MS_PER_TICK;
-    if (isExtinct(world)) {
+    if (isExtinct(world) && autoRebirthToggle.checked) {
       resetWorld();
       accum = 0;
       break;
     }
   }
   tickLabel.textContent = `Tick: ${world.tick}`;
+  updateHud();
   renderer.render(world);
   rafId = requestAnimationFrame(loop);
 }
@@ -87,17 +116,21 @@ function pause() {
 function step() {
   if (running) return;
   world.step(DT);
-  if (isExtinct(world)) {
+  if (isExtinct(world) && autoRebirthToggle.checked) {
     resetWorld();
     return;
   }
   tickLabel.textContent = `Tick: ${world.tick}`;
+  updateHud();
   renderer.render(world);
 }
 
 startButton.addEventListener('click', start);
 pauseButton.addEventListener('click', pause);
 stepButton.addEventListener('click', step);
+
+populationCapRange.addEventListener('input', applySettingsToWorld);
+chaosLevelRange.addEventListener('input', applySettingsToWorld);
 
 // --- Tool modes ---
 let toolMode = null; // 'spawn-agent' | 'spawn-resource' | 'force' | null
@@ -165,15 +198,26 @@ canvas.addEventListener('mouseleave', () => { pointerDown = false; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 function handleInteract(wp, e, isDown) {
+  let changed = false;
+
   if (toolMode === 'force') {
     const polarity = (e.buttons & 2) ? -1 : 1;
     world.paintForceField(wp, polarity);
+    changed = true;
   } else if (isDown && toolMode === 'spawn-agent') {
     spawnAgent(wp);
+    changed = true;
   } else if (isDown && toolMode === 'spawn-resource') {
     spawnResource(wp);
+    changed = true;
   } else if (isDown && toolMode === 'spawn-coral') {
     spawnCoral(wp);
+    changed = true;
+  }
+
+  if (changed && !running) {
+    updateHud();
+    renderer.render(world);
   }
 }
 
@@ -249,4 +293,9 @@ function spawnCoral(pos) {
 }
 
 // --- Initial render (deferred to ensure canvas is laid out) ---
-requestAnimationFrame(() => renderer.render(world));
+applySettingsToWorld();
+updateHud();
+requestAnimationFrame(() => {
+  renderer.render(world);
+  start(); // alive by default
+});
