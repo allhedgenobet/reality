@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for required files
+        run: |
+          for f in index.html style.css app.js core/ecs.js core/rng.js core/world.js core/render.js core/inspector.js; do
+            [ -f "$f" ] || { echo "Missing: $f"; exit 1; }
+          done
+          echo "All required files present."
+
+      - name: Verify ES module syntax (Node dry-run)
+        run: |
+          node --input-type=module <<'EOF'
+          import { createRng } from './core/rng.js';
+          import { createEcs } from './core/ecs.js';
+          const rng = createRng('test');
+          const ecs = createEcs();
+          const id = ecs.createEntity();
+          if (typeof id !== 'number') throw new Error('createEntity should return a number');
+          console.log('Module imports OK');
+          EOF
