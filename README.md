@@ -1,57 +1,68 @@
-ecosystem simulation
-# Reality Sandbox (Browser)
+# Reality Sandbox
 
-A deterministic 2D ecosystem/economy sandbox running entirely in the browser. This is the starting scaffold (M1): seeded RNG, fixed-timestep tick loop, and canvas rendering.
+A deterministic 2D browser-based ecosystem sandbox with agents, resources, force fields, and emergent food-chain dynamics — all running as a static site with zero build step.
 
-## Current Status (M1)
+[![Pages](https://github.com/allhedgenobet/reality/actions/workflows/pages.yml/badge.svg)](https://github.com/allhedgenobet/reality/actions/workflows/pages.yml)
+[![Lint](https://github.com/allhedgenobet/reality/actions/workflows/lint.yml/badge.svg)](https://github.com/allhedgenobet/reality/actions/workflows/lint.yml)
 
-Implemented pieces:
+## Features
 
-- Static site suitable for GitHub Pages
-- Seeded RNG (Mulberry32) with string seed
-- Fixed timestep simulation (`dt = 0.06` seconds)
-- Start / Pause / Step controls
-- Simple world state with a field of particles moving on a toroidal plane (wrap-around)
-- Basic canvas renderer with a subtle grid background
+- **Deterministic simulation** – Mulberry32 PRNG seeded from a timestamp; every run is reproducible.
+- **ECS-lite architecture** – entities are plain integer IDs; components are `Map`s; systems are pure functions.
+- **Three-tier food chain** – herbivore Agents → Predators → Apex hunters, each with DNA-driven traits.
+- **Emergent ecology** – plants regrow, seed pods explode into groves, and storminess ramps up under scarcity.
+- **Interactive tools** – spawn agents/resources, paint attractor/repulsor force fields, and zoom/pan.
+- **Entity inspector** – click any entity to view and live-edit its component data.
+- **No build step** – pure ES modules; runs directly in any modern browser.
+- **GitHub Pages ready** – deploy by pointing Pages at the repo root.
 
-This is the foundation for adding entities (Agent, Resource, ForceField), ECS-lite systems, tools, and audio.
-
-## Structure
-
-```text
-reality-sandbox/
-  index.html
-  style.css
-  app.js
-  README.md
-  /core
-    rng.js
-    world.js
-    render.js
-```
-
-- `rng.js` – deterministic PRNG for reproducible simulations
-- `world.js` – world state and `step(dt)` function (currently just particles + wrapping physics)
-- `render.js` – canvas rendering of the world
-- `app.js` – UI wiring and fixed-timestep main loop
-
-## Running Locally
-
-From this folder:
+## Quick Start
 
 ```bash
-cd reality-sandbox
+# Serve locally (requires Node.js)
 npx serve .
+# Then open http://localhost:3000
 ```
 
-Then open the printed URL (e.g. `http://localhost:3000/reality-sandbox/`), and use the **Start / Pause / Step** buttons to drive the simulation.
+Use the **Start / Pause / Step** buttons to drive the simulation, and the tool buttons to interact with the world.
 
-Because this is a static site, it will deploy cleanly to GitHub Pages by pointing Pages at the repo root.
+## Project Structure
 
-## Next Milestones
+```text
+reality/
+├── index.html          # Main HTML shell
+├── style.css           # UI and canvas styles
+├── app.js              # UI wiring, fixed-timestep loop, tool modes
+├── core/
+│   ├── ecs.js          # ECS-lite: entity IDs, component Maps, view() helper
+│   ├── rng.js          # Deterministic PRNG (Mulberry32) with string seed
+│   ├── world.js        # World state, all simulation systems
+│   ├── render.js       # Canvas renderer (camera, agents, resources, particles)
+│   └── inspector.js    # Entity inspector panel
+└── .github/
+    ├── workflows/      # CI/CD: lint, build, pages deployment
+    └── ISSUE_TEMPLATE/ # Bug report and feature request templates
+```
 
-- **M2:** ECS-lite with explicit entities/components/systems and Agent/Resource types
-- **M3:** Steering & metabolism systems, resource consumption & regrowth
-- **M4:** Reproduction, death, and calm/storm regimes
-- **M5:** Tools (spawn Agent/Resource, ForceField brush, entity inspector)
-- **M6:** Snapshot save/load (localStorage), audio mapping, and public deployment
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed breakdown of the ECS-lite design and each system.
+
+## Simulation Systems
+
+| System | Description |
+|---|---|
+| `physicsSystem` | Euler integration + toroidal wrapping |
+| `collisionSystem` | Soft-body overlap pushes between creatures |
+| `steeringSystem` | Seek nearest food/prey; separation from peers |
+| `metabolismSystem` | Energy drain, eating, kill bursts |
+| `ecologySystem` | Resource regen, seed pod explosions |
+| `lifeCycleSystem` | Reproduction with DNA mutation, death, burst decay |
+| `forceFieldSystem` | User-painted attractor/repulsor fields |
+| `regimeSystem` | Calm ↔ Storm transitions driven by population pressure |
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+MIT — see [LICENSE](LICENSE).

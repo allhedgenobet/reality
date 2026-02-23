@@ -1,0 +1,24 @@
+{
+  "name": "reality-sandbox",
+  "version": "1.0.0",
+  "description": "Deterministic 2D browser-based ecosystem sandbox with ECS-lite architecture",
+  "homepage": "https://allhedgenobet.github.io/reality/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/allhedgenobet/reality.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "npx serve .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
