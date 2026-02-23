@@ -2,12 +2,20 @@ export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
 
   let lastWorld = null;
+  let canvasW = 0;
+  let canvasH = 0;
+  let initialFitApplied = false;
 
-  function resize(world) {
+  const DEFAULT_CANVAS_WIDTH = 800;
+  const DEFAULT_CANVAS_HEIGHT = 600;
+
+  function resize() {
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    canvasW = rect.width || canvas.offsetWidth || DEFAULT_CANVAS_WIDTH;
+    canvasH = rect.height || canvas.offsetHeight || DEFAULT_CANVAS_HEIGHT;
+    canvas.width = canvasW * dpr;
+    canvas.height = canvasH * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
@@ -17,7 +25,7 @@ export function createRenderer(canvas) {
 
   function render(world) {
     lastWorld = world;
-    resize(world);
+    resize();
 
     const { width, height, ecs } = world;
 
@@ -33,29 +41,35 @@ export function createRenderer(canvas) {
 
     // Trails: soft fade instead of hard clear
     ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, canvasW, canvasH);
 
     // Background "fog" gradient instead of grid
     const fog = ctx.createRadialGradient(
-      width * 0.5,
-      height * 0.4,
+      canvasW * 0.5,
+      canvasH * 0.4,
       20,
-      width * 0.5,
-      height * 0.7,
-      Math.max(width, height) * 0.9,
+      canvasW * 0.5,
+      canvasH * 0.7,
+      Math.max(canvasW, canvasH) * 0.9,
     );
     fog.addColorStop(0, 'rgba(30, 42, 90, 0.6)');
     fog.addColorStop(0.5, 'rgba(8, 10, 30, 0.7)');
     fog.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
     ctx.fillStyle = fog;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, canvasW, canvasH);
 
     const { position, agent, predator, apex, burst, resource, forceField } = ecs.components;
 
     // Camera transform (zoom + pan around world.camera.x/y)
+    // Use canvas CSS dimensions so the camera center maps to the canvas center.
     const cam = world.camera || { zoom: 1, x: width * 0.5, y: height * 0.5 };
+    // On first render, fit the whole world into the canvas.
+    if (!initialFitApplied) {
+      cam.zoom = Math.min(canvasW / width, canvasH / height);
+      initialFitApplied = true;
+    }
     ctx.save();
-    ctx.translate(width * 0.5, height * 0.5);
+    ctx.translate(canvasW * 0.5, canvasH * 0.5);
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
 
@@ -382,12 +396,7 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Restore world transform before HUD/overlays (none yet)
-    ctx.restore();
-
     // Draw agents as colored blobs with outline, radius maps to energy
-    // (Agents are still drawn in world coordinates; if we want them to respect camera,
-    // we could move them before ctx.restore(). For now they float as a HUD-ish overlay.)
     for (const [id, ag] of agent.entries()) {
       const pos = position.get(id);
       if (!pos) continue;
@@ -447,6 +456,9 @@ export function createRenderer(canvas) {
         ctx.stroke();
       }
     }
+
+    // Restore camera transform
+    ctx.restore();
   }
 
   return { render };
