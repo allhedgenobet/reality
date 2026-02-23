@@ -333,6 +333,52 @@ export function createWorld(rng) {
     }
   }
 
+  const SPATIAL_CELL = 48;
+
+  function cellKey(cx, cy) {
+    return `${cx},${cy}`;
+  }
+
+  function buildSpatialIndex(entries, radius = 0) {
+    const grid = new Map();
+    for (const item of entries) {
+      const minCx = Math.floor((item.pos.x - radius) / SPATIAL_CELL);
+      const maxCx = Math.floor((item.pos.x + radius) / SPATIAL_CELL);
+      const minCy = Math.floor((item.pos.y - radius) / SPATIAL_CELL);
+      const maxCy = Math.floor((item.pos.y + radius) / SPATIAL_CELL);
+
+      for (let cx = minCx; cx <= maxCx; cx++) {
+        for (let cy = minCy; cy <= maxCy; cy++) {
+          const key = cellKey(cx, cy);
+          let bucket = grid.get(key);
+          if (!bucket) {
+            bucket = [];
+            grid.set(key, bucket);
+          }
+          bucket.push(item);
+        }
+      }
+    }
+    return grid;
+  }
+
+  function querySpatial(grid, x, y, radius) {
+    const out = [];
+    const minCx = Math.floor((x - radius) / SPATIAL_CELL);
+    const maxCx = Math.floor((x + radius) / SPATIAL_CELL);
+    const minCy = Math.floor((y - radius) / SPATIAL_CELL);
+    const maxCy = Math.floor((y + radius) / SPATIAL_CELL);
+
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        const bucket = grid.get(cellKey(cx, cy));
+        if (!bucket) continue;
+        out.push(...bucket);
+      }
+    }
+    return out;
+  }
+
   // Simple soft-body collisions: dynamic creatures gently push each other apart
   function collisionSystem(dt) {
     const { position, velocity, agent, predator, apex, coral, titan } = ecs.components;
@@ -412,14 +458,47 @@ export function createWorld(rng) {
     const { position, velocity, agent, predator, apex, coral, titan, resource } = ecs.components;
     const avoidRadius = 18;
 
-    // Build resource positions list once per tick
+    // Build spatial indexes once per tick for local neighbor queries
     const resourceList = [];
     for (const [id, res] of resource.entries()) {
       if (res.amount <= 0) continue;
       const pos = position.get(id);
       if (!pos) continue;
-      resourceList.push({ id, pos });
+      resourceList.push({ id, pos, data: res });
     }
+    const resourceGrid = buildSpatialIndex(resourceList, 0);
+
+    const agentList = [];
+    for (const [id, ag] of agent.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      agentList.push({ id, pos, data: ag });
+    }
+    const agentGrid = buildSpatialIndex(agentList, 0);
+
+    const predatorList = [];
+    for (const [id, pred] of predator.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      predatorList.push({ id, pos, data: pred });
+    }
+    const predatorGrid = buildSpatialIndex(predatorList, 0);
+
+    const coralList = [];
+    for (const [id, cr] of coral.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      coralList.push({ id, pos, data: cr });
+    }
+    const coralGrid = buildSpatialIndex(coralList, 0);
+
+    const apexList = [];
+    for (const [id, ap] of apex.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      apexList.push({ id, pos, data: ap });
+    }
+    const apexGrid = buildSpatialIndex(apexList, 0);
 
     for (const [id, ag] of agent.entries()) {
       const pos = position.get(id);
@@ -432,7 +511,8 @@ export function createWorld(rng) {
       let target = null;
       let targetDist2 = Infinity;
 
-      for (const r of resourceList) {
+      const nearbyResources = querySpatial(resourceGrid, pos.x, pos.y, seekRadius);
+      for (const r of nearbyResources) {
         const dx = r.pos.x - pos.x;
         const dy = r.pos.y - pos.y;
         const d2 = dx * dx + dy * dy;
@@ -459,10 +539,10 @@ export function createWorld(rng) {
       // Simple separation: avoid crowding other agents
       let ax = 0;
       let ay = 0;
-      for (const [id2] of agent.entries()) {
-        if (id2 === id) continue;
-        const p2 = position.get(id2);
-        if (!p2) continue;
+      const nearbyAgents = querySpatial(agentGrid, pos.x, pos.y, avoidRadius);
+      for (const other of nearbyAgents) {
+        if (other.id === id) continue;
+        const p2 = other.pos;
         const dx = pos.x - p2.x;
         const dy = pos.y - p2.y;
         const d2 = dx * dx + dy * dy;
@@ -495,9 +575,9 @@ export function createWorld(rng) {
 
       let target = null;
       let targetDist2 = Infinity;
-      for (const [aid] of agent.entries()) {
-        const apos = position.get(aid);
-        if (!apos) continue;
+      const nearbyAgents = querySpatial(agentGrid, pos.x, pos.y, seekRadius);
+      for (const prey of nearbyAgents) {
+        const apos = prey.pos;
         const dx = apos.x - pos.x;
         const dy = apos.y - pos.y;
         const d2 = dx * dx + dy * dy;
@@ -535,9 +615,9 @@ export function createWorld(rng) {
 
       let target = null;
       let targetDist2 = Infinity;
-      for (const [pid] of predator.entries()) {
-        const ppos = position.get(pid);
-        if (!ppos) continue;
+      const nearbyPredators = querySpatial(predatorGrid, pos.x, pos.y, seekRadius);
+      for (const prey of nearbyPredators) {
+        const ppos = prey.pos;
         const dx = ppos.x - pos.x;
         const dy = ppos.y - pos.y;
         const d2 = dx * dx + dy * dy;
@@ -546,9 +626,9 @@ export function createWorld(rng) {
           target = ppos;
         }
       }
-      for (const [cid] of coral.entries()) {
-        const cpos = position.get(cid);
-        if (!cpos) continue;
+      const nearbyCoral = querySpatial(coralGrid, pos.x, pos.y, seekRadius);
+      for (const prey of nearbyCoral) {
+        const cpos = prey.pos;
         const dx = cpos.x - pos.x;
         const dy = cpos.y - pos.y;
         const d2 = dx * dx + dy * dy;
@@ -585,9 +665,9 @@ export function createWorld(rng) {
 
       let target = null;
       let targetDist2 = Infinity;
-      for (const [aid] of agent.entries()) {
-        const apos = position.get(aid);
-        if (!apos) continue;
+      const nearbyAgents = querySpatial(agentGrid, pos.x, pos.y, seekRadius);
+      for (const prey of nearbyAgents) {
+        const apos = prey.pos;
         const dx = apos.x - pos.x;
         const dy = apos.y - pos.y;
         const d2 = dx * dx + dy * dy;
@@ -624,9 +704,9 @@ export function createWorld(rng) {
 
       let target = null;
       let targetDist2 = Infinity;
-      for (const [aid] of apex.entries()) {
-        const apos = position.get(aid);
-        if (!apos) continue;
+      const nearbyApex = querySpatial(apexGrid, pos.x, pos.y, seekRadius);
+      for (const prey of nearbyApex) {
+        const apos = prey.pos;
         const dx = apos.x - pos.x;
         const dy = apos.y - pos.y;
         const d2 = dx * dx + dy * dy;
@@ -657,6 +737,47 @@ export function createWorld(rng) {
     const eatRadius = 10;
     const baseDrain = 0.03 * world.globals.metabolism; // per second, modulated by regime
 
+    const resourceList = [];
+    for (const [id, res] of resource.entries()) {
+      if (res.amount <= 0) continue;
+      const pos = position.get(id);
+      if (!pos) continue;
+      resourceList.push({ id, pos, data: res });
+    }
+    const resourceGrid = buildSpatialIndex(resourceList, eatRadius);
+
+    const agentList = [];
+    for (const [id, ag] of agent.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      agentList.push({ id, pos, data: ag });
+    }
+    const agentGrid = buildSpatialIndex(agentList, 12);
+
+    const predatorList = [];
+    for (const [id, pred] of predator.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      predatorList.push({ id, pos, data: pred });
+    }
+    const predatorGrid = buildSpatialIndex(predatorList, 14);
+
+    const coralList = [];
+    for (const [id, cr] of coral.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      coralList.push({ id, pos, data: cr });
+    }
+    const coralGrid = buildSpatialIndex(coralList, 14);
+
+    const apexList = [];
+    for (const [id, ap] of apex.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      apexList.push({ id, pos, data: ap });
+    }
+    const apexGrid = buildSpatialIndex(apexList, 14);
+
     for (const [id, ag] of agent.entries()) {
       const dna = ag.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       ag.energy -= baseDrain * dna.metabolism * dt;
@@ -665,10 +786,11 @@ export function createWorld(rng) {
       const pos = position.get(id);
       if (!pos) continue;
 
-      for (const [rid, res] of resource.entries()) {
+      const nearbyResources = querySpatial(resourceGrid, pos.x, pos.y, eatRadius);
+      for (const r of nearbyResources) {
+        const res = r.data;
         if (res.amount <= 0) continue;
-        const rpos = position.get(rid);
-        if (!rpos) continue;
+        const rpos = r.pos;
         const dx = rpos.x - pos.x;
         const dy = rpos.y - pos.y;
         const d2 = dx * dx + dy * dy;
@@ -701,9 +823,12 @@ export function createWorld(rng) {
       // Skip hunting if still resting from a previous kill
       if (pred.rest > 0) continue;
 
-      for (const [aid, ag] of Array.from(agent.entries())) {
-        const apos = position.get(aid);
-        if (!apos) continue;
+      const nearbyAgents = querySpatial(agentGrid, ppos.x, ppos.y, predEatRadius);
+      for (const prey of nearbyAgents) {
+        const aid = prey.id;
+        const ag = prey.data;
+        if (!agent.has(aid)) continue;
+        const apos = prey.pos;
         const dx = apos.x - ppos.x;
         const dy = apos.y - ppos.y;
         const d2 = dx * dx + dy * dy;
@@ -754,9 +879,11 @@ export function createWorld(rng) {
       if (ap.rest > 0) continue;
 
       let eaten = false;
-      for (const [pid, pred] of Array.from(predator.entries())) {
-        const ppos = position.get(pid);
-        if (!ppos) continue;
+      const nearbyPredators = querySpatial(predatorGrid, apos.x, apos.y, apexEatRadius);
+      for (const prey of nearbyPredators) {
+        const pid = prey.id;
+        if (!predator.has(pid)) continue;
+        const ppos = prey.pos;
         const dx = ppos.x - apos.x;
         const dy = ppos.y - apos.y;
         const d2 = dx * dx + dy * dy;
@@ -773,9 +900,12 @@ export function createWorld(rng) {
       if (eaten) continue;
 
       // Also eat coral
-      for (const [cid, cr] of Array.from(coral.entries())) {
-        const cpos = position.get(cid);
-        if (!cpos) continue;
+      const nearbyCoral = querySpatial(coralGrid, apos.x, apos.y, apexEatRadius);
+      for (const prey of nearbyCoral) {
+        const cid = prey.id;
+        if (!coral.has(cid)) continue;
+        const cr = prey.data;
+        const cpos = prey.pos;
         const dx = cpos.x - apos.x;
         const dy = cpos.y - apos.y;
         const d2 = dx * dx + dy * dy;
@@ -804,9 +934,11 @@ export function createWorld(rng) {
       const tpos = position.get(tid);
       if (!tpos || tt.rest > 0) continue;
 
-      for (const [aid] of Array.from(apex.entries())) {
-        const apos = position.get(aid);
-        if (!apos) continue;
+      const nearbyApex = querySpatial(apexGrid, tpos.x, tpos.y, titanEatRadius);
+      for (const prey of nearbyApex) {
+        const aid = prey.id;
+        if (!apex.has(aid)) continue;
+        const apos = prey.pos;
         const dx = apos.x - tpos.x;
         const dy = apos.y - tpos.y;
         const d2 = dx * dx + dy * dy;
@@ -836,9 +968,12 @@ export function createWorld(rng) {
 
       if (cr.rest > 0) continue;
 
-      for (const [aid, ag] of Array.from(agent.entries())) {
-        const apos = position.get(aid);
-        if (!apos) continue;
+      const nearbyAgents = querySpatial(agentGrid, cpos.x, cpos.y, coralEatRadius);
+      for (const prey of nearbyAgents) {
+        const aid = prey.id;
+        const ag = prey.data;
+        if (!agent.has(aid)) continue;
+        const apos = prey.pos;
         const dx = apos.x - cpos.x;
         const dy = apos.y - cpos.y;
         const d2 = dx * dx + dy * dy;
