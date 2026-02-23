@@ -23,35 +23,21 @@ body {
 
 header {
   position: absolute;
-  top: 0.75rem;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0.6rem;
+  left: 0.6rem;
   z-index: 2;
-  text-align: center;
   margin: 0;
-  padding: 0.5rem 0.8rem;
-  border-radius: 10px;
-  background: rgba(4, 7, 20, 0.45);
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(4, 7, 20, 0.42);
   backdrop-filter: blur(4px);
-}
-
-h1 {
-  margin: 0;
-  font-weight: 600;
-}
-
-.tagline {
-  margin: 0.25rem 0 0.4rem;
-  color: #b7c0ff;
-  font-size: 0.9rem;
 }
 
 .status {
   margin: 0;
   display: flex;
-  justify-content: center;
-  gap: 1rem;
-  font-size: 0.8rem;
+  gap: 0.8rem;
+  font-size: 0.78rem;
   color: #c1c6ff;
 }
 
