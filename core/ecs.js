@@ -10,6 +10,7 @@ export function createEcs() {
     agent: new Map(),    // { colorHue, energy, dna, ... }
     predator: new Map(), // { colorHue, energy, age, dna, rest }
     apex: new Map(),     // { colorHue, energy, age, rest, dna }
+    coral: new Map(),    // { colorHue, energy, age, rest, dna } – middle-tier predator
     burst: new Map(),    // transient burst particles { vx, vy, life, hue }
     resource: new Map(), // { kind, amount, regenTimer, age, cycles, seedTimer }
     forceField: new Map(), // { strength, radius }

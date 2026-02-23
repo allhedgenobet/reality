@@ -28,6 +28,10 @@ export function createWorld(rng) {
   };
 
   // Spawn some initial agents and resources
+  const AGENT_COUNT = 18;
+  const PREDATOR_COUNT = 5;
+  const APEX_COUNT = 2;
+  const CORAL_COUNT = 4;
   const AGENT_COUNT = 22;
   const PREDATOR_COUNT = 7;
   const APEX_COUNT = 3;
@@ -148,6 +152,42 @@ export function createWorld(rng) {
     return id;
   }
 
+  function makeCoral(x, y, parentDna) {
+    const id = ecs.createEntity();
+    ecs.components.position.set(id, { x, y });
+
+    const dna = parentDna
+      ? {
+          speed:      clamp(parentDna.speed      + (rng.float() - 0.5) * 0.18, 0.4, 1.8),
+          sense:      clamp(parentDna.sense      + (rng.float() - 0.5) * 0.18, 0.5, 1.8),
+          metabolism: clamp(parentDna.metabolism + (rng.float() - 0.5) * 0.18, 0.4, 1.8),
+          hueShift:   clamp(parentDna.hueShift   + rng.int(-6, 6), -40, 40),
+          venom:      clamp(parentDna.venom      + (rng.float() - 0.5) * 0.12, 0, 0.9),
+        }
+      : {
+          speed:      0.5 + rng.float() * 0.8,
+          sense:      0.7 + rng.float() * 0.8,
+          metabolism: 0.5 + rng.float() * 0.8,
+          hueShift:   rng.int(-20, 20),
+          venom:      rng.float() * 0.6, // unique: reduces energy gained by apex when eaten
+        };
+
+    const speed = 45 * dna.speed;
+
+    ecs.components.velocity.set(id, {
+      vx: (rng.float() - 0.5) * speed,
+      vy: (rng.float() - 0.5) * speed,
+    });
+    ecs.components.coral.set(id, {
+      colorHue: 340 + dna.hueShift,
+      energy: 1.5,
+      age: 0,
+      rest: 0,
+      dna,
+    });
+    return id;
+  }
+
   function makeResource(x, y, kind = 'plant') {
     const id = ecs.createEntity();
     ecs.components.position.set(id, { x, y });
@@ -216,6 +256,10 @@ export function createWorld(rng) {
     makeApex(rng.float() * width, rng.float() * height);
   }
 
+  for (let i = 0; i < CORAL_COUNT; i++) {
+    makeCoral(rng.float() * width, rng.float() * height);
+  }
+
   for (let i = 0; i < RESOURCE_COUNT; i++) {
     const kind = rng.float() < 0.2 ? 'pod' : 'plant';
     makeResource(rng.float() * width, rng.float() * height, kind);
@@ -254,7 +298,7 @@ export function createWorld(rng) {
 
   // Simple soft-body collisions: dynamic creatures gently push each other apart
   function collisionSystem(dt) {
-    const { position, velocity, agent, predator, apex } = ecs.components;
+    const { position, velocity, agent, predator, apex, coral } = ecs.components;
     const entities = [];
 
     // Collect dynamic entities with an approximate radius
@@ -280,6 +324,14 @@ export function createWorld(rng) {
       if (!pos || !vel) continue;
       const energy = ap.energy ?? 3;
       const radius = 9 + energy * 2;
+      entities.push({ id, pos, vel, radius });
+    }
+    for (const [id, cr] of coral.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      const energy = cr.energy ?? 1.5;
+      const radius = 5 + energy * 2;
       entities.push({ id, pos, vel, radius });
     }
 
@@ -312,7 +364,7 @@ export function createWorld(rng) {
 
   // Steering: agents seek nearest resource and gently adjust velocity.
   function steeringSystem(dt) {
-    const { position, velocity, agent, predator, apex, resource } = ecs.components;
+    const { position, velocity, agent, predator, apex, coral, resource } = ecs.components;
     const avoidRadius = 18;
 
     // Build resource positions list once per tick
@@ -423,7 +475,7 @@ export function createWorld(rng) {
       }
     }
 
-    // Apex hunters seek predators only (top of chain)
+    // Apex hunters seek predators and coral (top of chain)
     const apexSeekRadius = 260;
     for (const [id, ap] of apex.entries()) {
       const pos = position.get(id);
@@ -449,6 +501,17 @@ export function createWorld(rng) {
           target = ppos;
         }
       }
+      for (const [cid] of coral.entries()) {
+        const cpos = position.get(cid);
+        if (!cpos) continue;
+        const dx = cpos.x - pos.x;
+        const dy = cpos.y - pos.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < targetDist2 && d2 < seekRadius * seekRadius) {
+          targetDist2 = d2;
+          target = cpos;
+        }
+      }
 
       if (target) {
         const dx = target.x - pos.x;
@@ -463,11 +526,50 @@ export function createWorld(rng) {
       }
     }
 
+    // Coral hunters seek agents
+    const coralSeekRadius = 180;
+    for (const [id, cr] of coral.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+
+      if (cr.rest && cr.rest > 0) continue;
+
+      const dna = cr.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0, venom: 0 };
+      const seekRadius = coralSeekRadius * dna.sense;
+
+      let target = null;
+      let targetDist2 = Infinity;
+      for (const [aid] of agent.entries()) {
+        const apos = position.get(aid);
+        if (!apos) continue;
+        const dx = apos.x - pos.x;
+        const dy = apos.y - pos.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < targetDist2 && d2 < seekRadius * seekRadius) {
+          targetDist2 = d2;
+          target = apos;
+        }
+      }
+
+      if (target) {
+        const dx = target.x - pos.x;
+        const dy = target.y - pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const desiredSpeed = 50 * dna.speed;
+        const desiredVx = (dx / dist) * desiredSpeed;
+        const desiredVy = (dy / dist) * desiredSpeed;
+        const blend = 0.7;
+        vel.vx = vel.vx * blend + desiredVx * (1 - blend);
+        vel.vy = vel.vy * blend + desiredVy * (1 - blend);
+      }
+    }
+
   }
 
   // Metabolism & eating: agents lose energy over time, gain by consuming resources.
   function metabolismSystem(dt) {
-    const { position, agent, predator, apex, resource, burst } = ecs.components;
+    const { position, agent, predator, apex, coral, resource, burst } = ecs.components;
     const eatRadius = 10;
     const baseDrain = 0.03 * world.globals.metabolism; // per second, modulated by regime
 
@@ -548,9 +650,10 @@ export function createWorld(rng) {
       }
     }
 
-    // Apex metabolism and eating predators
+    // Apex metabolism and eating predators and coral
     const apexEatRadius = 12;
     const apexDrain = baseDrain * 1.1;
+    const VENOM_ENERGY_PENALTY = 0.5; // fraction by which high-venom coral reduces apex energy gain
     for (const [aid, ap] of apex.entries()) {
       const dna = ap.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       ap.rest = Math.max(0, (ap.rest || 0) - dt);
@@ -566,6 +669,7 @@ export function createWorld(rng) {
       // Skip hunting while resting
       if (ap.rest > 0) continue;
 
+      let eaten = false;
       for (const [pid, pred] of Array.from(predator.entries())) {
         const ppos = position.get(pid);
         if (!ppos) continue;
@@ -575,6 +679,7 @@ export function createWorld(rng) {
         if (d2 < apexEatRadius * apexEatRadius) {
           ecs.destroyEntity(pid);
           ap.energy = Math.min(5.0, ap.energy + 1.5);
+          eaten = true;
 
           // Occasionally burst when very full
           if (ap.energy > 3.5 && rng.float() < 0.45) {
@@ -609,6 +714,7 @@ export function createWorld(rng) {
             pushEntity(agent);
             pushEntity(predator);
             pushEntity(apex);
+            pushEntity(coral);
 
             // Apex "supernova": consume itself in the burst
             ecs.destroyEntity(aid);
@@ -616,6 +722,71 @@ export function createWorld(rng) {
           }
 
           ap.rest = 4 + rng.float() * 2; // 4–6s rest after eating a predator
+          break;
+        }
+      }
+      if (eaten) continue;
+
+      // Also eat coral
+      for (const [cid, cr] of Array.from(coral.entries())) {
+        const cpos = position.get(cid);
+        if (!cpos) continue;
+        const dx = cpos.x - apos.x;
+        const dy = cpos.y - apos.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < apexEatRadius * apexEatRadius) {
+          const venom = cr.dna?.venom ?? 0;
+          ecs.destroyEntity(cid);
+          ap.energy = Math.min(5.0, ap.energy + 1.0 * (1 - venom * VENOM_ENERGY_PENALTY));
+          ap.rest = 3 + rng.float() * 2; // slightly shorter rest after eating coral
+          break;
+        }
+      }
+    }
+
+    // Coral metabolism and eating agents
+    const coralEatRadius = 8;
+    const coralDrain = baseDrain * 1.5;
+    for (const [cid, cr] of coral.entries()) {
+      const dna = cr.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0, venom: 0 };
+      cr.rest = Math.max(0, (cr.rest || 0) - dt);
+      cr.age = (cr.age || 0) + dt;
+
+      const restFactor = cr.rest > 0 ? 0.4 : 1.0;
+      cr.energy -= coralDrain * dna.metabolism * dt * restFactor;
+      if (cr.energy < 0) cr.energy = 0;
+
+      const cpos = position.get(cid);
+      if (!cpos) continue;
+
+      if (cr.rest > 0) continue;
+
+      for (const [aid, ag] of Array.from(agent.entries())) {
+        const apos = position.get(aid);
+        if (!apos) continue;
+        const dx = apos.x - cpos.x;
+        const dy = apos.y - cpos.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < coralEatRadius * coralEatRadius) {
+          // Spawn absorption particles
+          const particles = 3;
+          const hue = cr.colorHue ?? 340;
+          const baseSpeed = 60;
+          for (let i = 0; i < particles; i++) {
+            const pid = ecs.createEntity();
+            position.set(pid, { x: apos.x, y: apos.y });
+            const vx = (cpos.x - apos.x) * (0.8 + rng.float() * 0.5);
+            const vy = (cpos.y - apos.y) * (0.8 + rng.float() * 0.5);
+            burst.set(pid, {
+              vx: vx * (baseSpeed / (Math.hypot(vx, vy) || 1)),
+              vy: vy * (baseSpeed / (Math.hypot(vx, vy) || 1)),
+              life: 0.4 + rng.float() * 0.3,
+              hue,
+            });
+          }
+          ecs.destroyEntity(aid);
+          cr.energy = Math.min(3.0, cr.energy + 0.9);
+          cr.rest = 3 + rng.float() * 2; // 3–5s rest after a kill
           break;
         }
       }
@@ -692,7 +863,7 @@ export function createWorld(rng) {
 
   // Reproduction & growth.
   function lifeCycleSystem(dt) {
-    const { position, velocity, agent, predator, apex, burst } = ecs.components;
+    const { position, velocity, agent, predator, apex, coral, burst } = ecs.components;
 
     // Herbivore lifecycle
     for (const [id, ag] of Array.from(agent.entries())) {
@@ -773,6 +944,30 @@ export function createWorld(rng) {
       }
 
       if (ap.energy <= 0) {
+        ecs.destroyEntity(id);
+      }
+    }
+
+    // Coral lifecycle: reproduce + death when starved
+    for (const [id, cr] of Array.from(coral.entries())) {
+      if (cr.energy >= 2.5 && cr.age > 12) {
+        const pos = position.get(id);
+        const vel = velocity.get(id);
+        if (pos && vel) {
+          const jitter = () => (rng.float() - 0.5) * 10;
+          const childId = makeCoral(
+            pos.x + jitter(),
+            pos.y + jitter(),
+            cr.dna,
+          );
+          const childVel = velocity.get(childId);
+          childVel.vx = vel.vx + jitter();
+          childVel.vy = vel.vy + jitter();
+          cr.energy *= 0.5;
+        }
+      }
+
+      if (cr.energy <= 0) {
         ecs.destroyEntity(id);
       }
     }

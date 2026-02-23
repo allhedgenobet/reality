@@ -58,7 +58,7 @@ export function createRenderer(canvas) {
     ctx.fillStyle = fog;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    const { position, agent, predator, apex, burst, resource, forceField } = ecs.components;
+    const { position, agent, predator, apex, coral, burst, resource, forceField } = ecs.components;
 
     // Camera transform (zoom + pan around world.camera.x/y)
     // Use canvas CSS dimensions so the camera center maps to the canvas center.
@@ -393,6 +393,53 @@ export function createRenderer(canvas) {
           ctx.arc(x, y, dotR, 0, Math.PI * 2);
           ctx.fill();
         }
+      }
+    }
+
+    // Draw coral creatures as pentagons with coral-magenta coloring
+    for (const [id, cr] of coral.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      const energy = cr.energy ?? 1.5;
+      const age = cr.age ?? 0;
+      const radiusBase = 5 + energy * 2;
+      const radius = age > 15 ? radiusBase * 1.12 : radiusBase;
+      const hue = (cr.colorHue ?? 340) + wobbleHue + stormHueShift;
+      const dna = cr.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0, venom: 0 };
+      const venomNorm = Math.max(0, Math.min(1, dna.venom ?? 0));
+
+      const saturation = 72 + venomNorm * 18 + wobbleSat + stormSatBoost;
+      const lightness = 58 + (1 - venomNorm) * 8 + wobbleLight + stormLightShift;
+
+      ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.92)`;
+      ctx.strokeStyle = `hsla(${hue}, 95%, 38%, 0.9)`;
+      ctx.lineWidth = 1.3;
+
+      // Pentagon shape (5 sides)
+      const vel = ecs.components.velocity.get(id);
+      const hasVel = vel && (Math.abs(vel.vx) + Math.abs(vel.vy) > 0.5);
+      const facing = hasVel ? Math.atan2(vel.vy, vel.vx) : (id * 0.5 + world.tick * 0.008);
+      const sides = 5;
+
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const a = facing + (i / sides) * Math.PI * 2 - Math.PI * 0.5;
+        const x = pos.x + Math.cos(a) * radius;
+        const y = pos.y + Math.sin(a) * radius;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Inner venom ring for high-venom individuals
+      if (venomNorm > 0.35) {
+        ctx.strokeStyle = `hsla(${(hue + 30) % 360}, 90%, 75%, ${0.3 + venomNorm * 0.4})`;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius * 0.55, 0, Math.PI * 2);
+        ctx.stroke();
       }
     }
 
