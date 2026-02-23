@@ -106,7 +106,7 @@ zoomOutButton.addEventListener('click', () => {
 
 // --- Canvas coordinate mapping ---
 // Inverse of the camera transform applied in render.js:
-//   ctx.translate(world.width * 0.5, world.height * 0.5)
+//   ctx.translate(canvasW * 0.5, canvasH * 0.5)
 //   ctx.scale(cam.zoom, cam.zoom)
 //   ctx.translate(-cam.x, -cam.y)
 function canvasToWorld(e) {
@@ -114,8 +114,8 @@ function canvasToWorld(e) {
   const cssX = e.clientX - rect.left;
   const cssY = e.clientY - rect.top;
   const cam = world.camera;
-  const wx = (cssX - world.width * 0.5) / cam.zoom + cam.x;
-  const wy = (cssY - world.height * 0.5) / cam.zoom + cam.y;
+  const wx = (cssX - rect.width * 0.5) / cam.zoom + cam.x;
+  const wy = (cssY - rect.height * 0.5) / cam.zoom + cam.y;
   return { x: wx, y: wy };
 }
 
@@ -196,5 +196,5 @@ function spawnResource(pos) {
   });
 }
 
-// --- Initial render ---
-renderer.render(world);
+// --- Initial render (deferred to ensure canvas is laid out) ---
+requestAnimationFrame(() => renderer.render(world));
