@@ -33,6 +33,7 @@ export function createWorld(rng) {
   const PREDATOR_COUNT = 7;
   const APEX_COUNT = 3;
   const CORAL_COUNT = 4;
+  const TITAN_COUNT = 1;
   const RESOURCE_COUNT = 70;
 
   function clamp(value, min, max) {
@@ -186,6 +187,40 @@ export function createWorld(rng) {
     return id;
   }
 
+  function makeTitan(x, y, parentDna) {
+    const id = ecs.createEntity();
+    ecs.components.position.set(id, { x, y });
+
+    const dna = parentDna
+      ? {
+          speed: clamp(parentDna.speed + (rng.float() - 0.5) * 0.1, 0.5, 1.5),
+          sense: clamp(parentDna.sense + (rng.float() - 0.5) * 0.1, 0.8, 1.8),
+          metabolism: clamp(parentDna.metabolism + (rng.float() - 0.5) * 0.1, 0.5, 1.6),
+          hueShift: clamp(parentDna.hueShift + rng.int(-3, 3), -20, 20),
+        }
+      : {
+          speed: 0.8 + rng.float() * 0.4,
+          sense: 1.0 + rng.float() * 0.5,
+          metabolism: 0.8 + rng.float() * 0.4,
+          hueShift: rng.int(-10, 10),
+        };
+
+    const speed = 40 * dna.speed;
+
+    ecs.components.velocity.set(id, {
+      vx: (rng.float() - 0.5) * speed,
+      vy: (rng.float() - 0.5) * speed,
+    });
+    ecs.components.titan.set(id, {
+      colorHue: 260 + dna.hueShift,
+      energy: 4.0,
+      age: 0,
+      rest: 0,
+      dna,
+    });
+    return id;
+  }
+
   function makeResource(x, y, kind = 'plant') {
     const id = ecs.createEntity();
     ecs.components.position.set(id, { x, y });
@@ -258,6 +293,10 @@ export function createWorld(rng) {
     makeCoral(rng.float() * width, rng.float() * height);
   }
 
+  for (let i = 0; i < TITAN_COUNT; i++) {
+    makeTitan(rng.float() * width, rng.float() * height);
+  }
+
   for (let i = 0; i < RESOURCE_COUNT; i++) {
     const kind = rng.float() < 0.2 ? 'pod' : 'plant';
     makeResource(rng.float() * width, rng.float() * height, kind);
@@ -296,7 +335,7 @@ export function createWorld(rng) {
 
   // Simple soft-body collisions: dynamic creatures gently push each other apart
   function collisionSystem(dt) {
-    const { position, velocity, agent, predator, apex, coral } = ecs.components;
+    const { position, velocity, agent, predator, apex, coral, titan } = ecs.components;
     const entities = [];
 
     // Collect dynamic entities with an approximate radius
@@ -332,6 +371,14 @@ export function createWorld(rng) {
       const radius = 5 + energy * 2;
       entities.push({ id, pos, vel, radius });
     }
+    for (const [id, tt] of titan.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      const energy = tt.energy ?? 4;
+      const radius = 10 + energy * 2.2;
+      entities.push({ id, pos, vel, radius });
+    }
 
     const strength = 40; // how strongly overlaps push
 
@@ -362,7 +409,7 @@ export function createWorld(rng) {
 
   // Steering: agents seek nearest resource and gently adjust velocity.
   function steeringSystem(dt) {
-    const { position, velocity, agent, predator, apex, coral, resource } = ecs.components;
+    const { position, velocity, agent, predator, apex, coral, titan, resource } = ecs.components;
     const avoidRadius = 18;
 
     // Build resource positions list once per tick
@@ -563,11 +610,50 @@ export function createWorld(rng) {
       }
     }
 
+    // Titans hunt apex hexagons
+    const titanSeekRadius = 300;
+    for (const [id, tt] of titan.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+
+      if (tt.rest && tt.rest > 0) continue;
+
+      const dna = tt.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      const seekRadius = titanSeekRadius * dna.sense;
+
+      let target = null;
+      let targetDist2 = Infinity;
+      for (const [aid] of apex.entries()) {
+        const apos = position.get(aid);
+        if (!apos) continue;
+        const dx = apos.x - pos.x;
+        const dy = apos.y - pos.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < targetDist2 && d2 < seekRadius * seekRadius) {
+          targetDist2 = d2;
+          target = apos;
+        }
+      }
+
+      if (target) {
+        const dx = target.x - pos.x;
+        const dy = target.y - pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const desiredSpeed = 62 * dna.speed;
+        const desiredVx = (dx / dist) * desiredSpeed;
+        const desiredVy = (dy / dist) * desiredSpeed;
+        const blend = 0.72;
+        vel.vx = vel.vx * blend + desiredVx * (1 - blend);
+        vel.vy = vel.vy * blend + desiredVy * (1 - blend);
+      }
+    }
+
   }
 
   // Metabolism & eating: agents lose energy over time, gain by consuming resources.
   function metabolismSystem(dt) {
-    const { position, agent, predator, apex, coral, resource, burst } = ecs.components;
+    const { position, agent, predator, apex, coral, titan, resource, burst } = ecs.components;
     const eatRadius = 10;
     const baseDrain = 0.03 * world.globals.metabolism; // per second, modulated by regime
 
@@ -742,6 +828,36 @@ export function createWorld(rng) {
       }
     }
 
+    // Titans metabolize and eat apex
+    const titanEatRadius = 13;
+    const titanDrain = baseDrain * 1.25;
+    for (const [tid, tt] of titan.entries()) {
+      const dna = tt.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      tt.rest = Math.max(0, (tt.rest || 0) - dt);
+      tt.age = (tt.age || 0) + dt;
+
+      const restFactor = tt.rest > 0 ? 0.35 : 1.0;
+      tt.energy -= titanDrain * dna.metabolism * dt * restFactor;
+      if (tt.energy < 0) tt.energy = 0;
+
+      const tpos = position.get(tid);
+      if (!tpos || tt.rest > 0) continue;
+
+      for (const [aid] of Array.from(apex.entries())) {
+        const apos = position.get(aid);
+        if (!apos) continue;
+        const dx = apos.x - tpos.x;
+        const dy = apos.y - tpos.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < titanEatRadius * titanEatRadius) {
+          ecs.destroyEntity(aid);
+          tt.energy = Math.min(6.0, tt.energy + 1.6);
+          tt.rest = 5 + rng.float() * 3;
+          break;
+        }
+      }
+    }
+
     // Coral metabolism and eating agents
     const coralEatRadius = 8;
     const coralDrain = baseDrain * 1.5;
@@ -861,7 +977,7 @@ export function createWorld(rng) {
 
   // Reproduction & growth.
   function lifeCycleSystem(dt) {
-    const { position, velocity, agent, predator, apex, coral, burst } = ecs.components;
+    const { position, velocity, agent, predator, apex, coral, titan, burst } = ecs.components;
 
     // Herbivore lifecycle
     for (const [id, ag] of Array.from(agent.entries())) {
@@ -966,6 +1082,26 @@ export function createWorld(rng) {
       }
 
       if (cr.energy <= 0) {
+        ecs.destroyEntity(id);
+      }
+    }
+
+    // Titan lifecycle
+    for (const [id, tt] of Array.from(titan.entries())) {
+      if (tt.energy >= 4.8 && tt.age > 20 && rng.float() < 0.06) {
+        const pos = position.get(id);
+        const vel = velocity.get(id);
+        if (pos && vel) {
+          const jitter = () => (rng.float() - 0.5) * 14;
+          const childId = makeTitan(pos.x + jitter(), pos.y + jitter(), tt.dna);
+          const childVel = velocity.get(childId);
+          childVel.vx = vel.vx + jitter();
+          childVel.vy = vel.vy + jitter();
+          tt.energy *= 0.6;
+        }
+      }
+
+      if (tt.energy <= 0) {
         ecs.destroyEntity(id);
       }
     }

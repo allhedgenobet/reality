@@ -58,7 +58,7 @@ export function createRenderer(canvas) {
     ctx.fillStyle = fog;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    const { position, agent, predator, apex, coral, burst, resource, forceField } = ecs.components;
+    const { position, agent, predator, apex, coral, titan, burst, resource, forceField } = ecs.components;
 
     // Camera transform (zoom + pan around world.camera.x/y)
     // Use canvas CSS dimensions so the camera center maps to the canvas center.
@@ -394,6 +394,30 @@ export function createRenderer(canvas) {
           ctx.fill();
         }
       }
+    }
+
+    // Draw titans: heavy rings that hunt apex
+    for (const [id, tt] of titan.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      const energy = tt.energy ?? 4;
+      const radius = 11 + energy * 2.2;
+      const hue = (tt.colorHue ?? 260) + wobbleHue + stormHueShift;
+
+      ctx.fillStyle = `hsla(${hue}, ${78 + wobbleSat + stormSatBoost}%, ${48 + wobbleLight + stormLightShift}%, 0.88)`;
+      ctx.strokeStyle = `hsla(${(hue + 20) % 360}, 96%, 68%, 0.95)`;
+      ctx.lineWidth = 1.8;
+
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = `hsla(${(hue + 45) % 360}, 95%, 75%, 0.8)`;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, radius * 0.58, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     // Draw coral creatures as pentagons with coral-magenta coloring

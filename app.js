@@ -21,8 +21,8 @@ let accum = 0;
 let rafId = null;
 
 function isExtinct(currentWorld) {
-  const { agent, predator, apex, coral } = currentWorld.ecs.components;
-  return agent.size === 0 && predator.size === 0 && apex.size === 0 && coral.size === 0;
+  const { agent, predator, apex, coral, titan } = currentWorld.ecs.components;
+  return agent.size === 0 && predator.size === 0 && apex.size === 0 && coral.size === 0 && titan.size === 0;
 }
 
 function resetWorld() {
