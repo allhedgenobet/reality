@@ -15,6 +15,7 @@ const pauseButton = document.getElementById('pauseButton');
 const stepButton = document.getElementById('stepButton');
 const spawnAgentButton = document.getElementById('spawnAgentButton');
 const spawnResourceButton = document.getElementById('spawnResourceButton');
+const spawnCoralButton = document.getElementById('spawnCoralButton');
 const forceBrushButton = document.getElementById('forceBrushButton');
 const zoomInButton = document.getElementById('zoomInButton');
 const zoomOutButton = document.getElementById('zoomOutButton');
@@ -82,11 +83,13 @@ function setToolMode(mode) {
   toolMode = toolMode === mode ? null : mode;
   spawnAgentButton.classList.toggle('active', toolMode === 'spawn-agent');
   spawnResourceButton.classList.toggle('active', toolMode === 'spawn-resource');
+  spawnCoralButton.classList.toggle('active', toolMode === 'spawn-coral');
   forceBrushButton.classList.toggle('active', toolMode === 'force');
 }
 
 spawnAgentButton.addEventListener('click', () => setToolMode('spawn-agent'));
 spawnResourceButton.addEventListener('click', () => setToolMode('spawn-resource'));
+spawnCoralButton.addEventListener('click', () => setToolMode('spawn-coral'));
 forceBrushButton.addEventListener('click', () => setToolMode('force'));
 
 // --- Zoom ---
@@ -146,6 +149,8 @@ function handleInteract(wp, e, isDown) {
     spawnAgent(wp);
   } else if (isDown && toolMode === 'spawn-resource') {
     spawnResource(wp);
+  } else if (isDown && toolMode === 'spawn-coral') {
+    spawnCoral(wp);
   }
 }
 
@@ -192,6 +197,30 @@ function spawnResource(pos) {
       thickness: 0.6 + rng.float() * 0.8,
       depth: 0.2 + rng.float() * 0.7,
       lean: (rng.float() - 0.5) * 0.6,
+    },
+  });
+}
+
+function spawnCoral(pos) {
+  const { ecs } = world;
+  const id = ecs.createEntity();
+  const hueShift = rng.int(-20, 20);
+  ecs.components.position.set(id, { x: pos.x, y: pos.y });
+  ecs.components.velocity.set(id, {
+    vx: (rng.float() - 0.5) * 40,
+    vy: (rng.float() - 0.5) * 40,
+  });
+  ecs.components.coral.set(id, {
+    colorHue: 340 + hueShift,
+    energy: 1.5,
+    age: 0,
+    rest: 0,
+    dna: {
+      speed: 0.5 + rng.float() * 0.8,
+      sense: 0.7 + rng.float() * 0.8,
+      metabolism: 0.5 + rng.float() * 0.8,
+      hueShift,
+      venom: rng.float() * 0.6,
     },
   });
 }
