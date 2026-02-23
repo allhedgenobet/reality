@@ -205,7 +205,7 @@ export function createWorld(rng) {
           hueShift: rng.int(-10, 10),
         };
 
-    const speed = 40 * dna.speed;
+    const speed = 28 * dna.speed;
 
     ecs.components.velocity.set(id, {
       vx: (rng.float() - 0.5) * speed,
@@ -640,7 +640,7 @@ export function createWorld(rng) {
         const dx = target.x - pos.x;
         const dy = target.y - pos.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const desiredSpeed = 62 * dna.speed;
+        const desiredSpeed = 44 * dna.speed;
         const desiredVx = (dx / dist) * desiredSpeed;
         const desiredVy = (dy / dist) * desiredSpeed;
         const blend = 0.72;
