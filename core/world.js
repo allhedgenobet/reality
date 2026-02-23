@@ -28,13 +28,10 @@ export function createWorld(rng) {
   };
 
   // Spawn some initial agents and resources
-  const AGENT_COUNT = 18;
-  const PREDATOR_COUNT = 5;
-  const APEX_COUNT = 2;
-  const CORAL_COUNT = 4;
   const AGENT_COUNT = 22;
   const PREDATOR_COUNT = 7;
   const APEX_COUNT = 3;
+  const CORAL_COUNT = 4;
   const RESOURCE_COUNT = 70;
 
   function clamp(value, min, max) {
