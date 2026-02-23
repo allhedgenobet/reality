@@ -82,12 +82,16 @@ button {
 #stepButton,
 #spawnAgentButton,
 #spawnResourceButton,
-#forceBrushButton {
+#forceBrushButton,
+#zoomInButton,
+#zoomOutButton {
   background: rgba(255, 255, 255, 0.06);
   color: #e4e7ff;
 }
 
-#forceBrushButton.active {
+#forceBrushButton.active,
+#spawnAgentButton.active,
+#spawnResourceButton.active {
   background: rgba(160, 120, 255, 0.3);
 }
 
