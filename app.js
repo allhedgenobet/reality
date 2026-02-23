@@ -1,6 +1,6 @@
-import { createRng } from './core/rng.js';
-import { createWorld } from './core/world.js';
-import { createRenderer } from './core/render.js';
+import { createRng } from './core/rng.js?v=20260223-2';
+import { createWorld } from './core/world.js?v=20260223-2';
+import { createRenderer } from './core/render.js?v=20260223-2';
 
 let seedStr = String(Date.now());
 let rng = createRng(seedStr);
