@@ -10,61 +10,14 @@
   <main class="app">
     <header>
       <h1>Reality Sandbox</h1>
-      <p class="tagline">Deterministic 2D ecosystem sandbox with agents, resources, and fields.</p>
+      <p class="tagline">Deterministic 2D ecosystem sandbox</p>
+      <p class="status">
+        <span id="tickLabel">Tick: 0</span>
+        <span>Seed: <code id="seedValue"></code></span>
+      </p>
     </header>
 
-    <section class="controls" aria-label="Simulation controls">
-      <div class="transport">
-        <button id="startButton">Start</button>
-        <button id="pauseButton" disabled>Pause</button>
-        <button id="stepButton" disabled>Step</button>
-      </div>
-      <div class="tools">
-        <button id="spawnAgentButton">+ Agent</button>
-        <button id="spawnResourceButton">+ Resource</button>
-        <button id="spawnCoralButton">+ Coral</button>
-        <button id="forceBrushButton" data-mode="force">Force Brush</button>
-        <button id="zoomInButton">Zoom +</button>
-        <button id="zoomOutButton">Zoom −</button>
-      </div>
-      <div class="status">
-        <span id="tickLabel">Tick: 0</span>
-        <span id="seedLabel">Seed: <code id="seedValue"></code></span>
-      </div>
-    </section>
-
-    <section class="hud" aria-label="World stats">
-      <span>Agents: <strong id="countAgents">0</strong></span>
-      <span>Predators: <strong id="countPredators">0</strong></span>
-      <span>Apex: <strong id="countApex">0</strong></span>
-      <span>Coral: <strong id="countCoral">0</strong></span>
-      <span>Resources: <strong id="countResources">0</strong></span>
-    </section>
-
-    <section class="settings" aria-label="Simulation settings">
-      <label class="setting-item checkbox">
-        <input type="checkbox" id="autoRebirthToggle" checked />
-        <span>Auto-rebirth</span>
-      </label>
-      <label class="setting-item">
-        <span>Population cap</span>
-        <input type="range" id="populationCapRange" min="20" max="400" step="10" value="220" />
-        <output id="populationCapValue" for="populationCapRange">220</output>
-      </label>
-      <label class="setting-item">
-        <span>Chaos level</span>
-        <input type="range" id="chaosLevelRange" min="0" max="100" step="1" value="35" />
-        <output id="chaosLevelValue" for="chaosLevelRange">35%</output>
-      </label>
-    </section>
-
-    <section class="main-panel">
-      <canvas id="world" aria-label="Reality Sandbox world"></canvas>
-    </section>
-
-    <footer>
-      <p>M1: seeded tick loop + canvas render. Future: agents, resources, force fields, audio.</p>
-    </footer>
+    <canvas id="world" aria-label="Reality Sandbox world"></canvas>
   </main>
 
   <script type="module" src="app.js"></script>
