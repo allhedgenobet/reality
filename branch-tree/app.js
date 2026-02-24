@@ -144,8 +144,8 @@ function step() {
 
     const canReproduce = t.energy > 45 && t.width > 0.55;
     if (canReproduce && Math.random() < 0.0015) {
-      const sx = t.x + (Math.random() * 2 - 1) * 90;
-      const sy = window.innerHeight - (6 + Math.random() * 16);
+      const sx = t.x + (Math.random() * 2 - 1) * 14;
+      const sy = t.y + (Math.random() * 2 - 1) * 14;
       spawnTree(sx, sy, 0.62 + Math.random() * 0.35, g);
     }
 
