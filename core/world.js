@@ -304,7 +304,7 @@ export function createWorld(rng) {
       regenTimer: rng.float() * 5,
       age: 0,
       cycles: 0, // growth cycles completed
-      seedTimer: kind === 'pod' ? 10 + rng.float() * 12 : null,
+      seedTimer: kind === 'pod' ? 6 + rng.float() * 8 : null,
       dna,
     });
     return id;
@@ -1303,7 +1303,7 @@ export function createWorld(rng) {
       if (res.kind === 'pod') podCount++;
     }
 
-    const MAX_PODS = 80;          // soft global cap
+    const MAX_PODS = 500;         // soft global cap
     const MAX_POD_CYCLES = 3;     // per-pod explosion limit
 
     for (const [id, res] of resource.entries()) {
@@ -1345,7 +1345,7 @@ export function createWorld(rng) {
         res.amount = 0.3;
         res.cycles = (res.cycles || 0) + 1;
         res.age = 0; // reset per-cycle animation
-        res.seedTimer = 10 + rng.float() * 12;
+        res.seedTimer = 6 + rng.float() * 8;
         podCount++; // track new pod
       }
 
