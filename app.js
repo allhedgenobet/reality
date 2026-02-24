@@ -10,7 +10,7 @@ let running = true;
 let latestWorld = null;
 let hasFreshFrame = false;
 
-const worker = new Worker(new URL('./sim.worker.js?v=20260223-6', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./sim.worker.js?v=20260223-7', import.meta.url), { type: 'module' });
 
 const state = {
   tick: 0,
@@ -149,7 +149,7 @@ canvas.addEventListener('wheel', (e) => {
     canvas.clientWidth / (latestWorld.width || 1200),
     canvas.clientHeight / (latestWorld.height || 720),
   );
-  const min = Math.max(0.03, fitMin * 0.1); // allow ~10x further zoom-out
+  const min = Math.max(0.3, fitMin); // keep viewport fully populated
   const max = 8;
   const nextZoom = Math.max(min, Math.min(max, latestWorld.camera.zoom - delta * step));
   latestWorld.camera.zoom = nextZoom;

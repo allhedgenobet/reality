@@ -194,7 +194,8 @@ onmessage = (e) => {
   if (type === 'pause') running = false;
   if (type === 'resume') running = true;
   if (type === 'setZoom' && Number.isFinite(zoom)) {
-    world.camera.zoom = Math.max(0.03, Math.min(8, zoom));
+    // Keep minimum zoom at fit-like floor from UI side to avoid empty margins.
+    world.camera.zoom = Math.max(0.3, Math.min(8, zoom));
   }
 };
 
