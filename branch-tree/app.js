@@ -129,11 +129,11 @@ function maybeSpawnGrazersFromDensity() {
       py: (cy + 0.5) * cell,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      r: 9,
-      maxR: 38 + Math.random() * 20,
+      r: 11,
+      maxR: 52 + Math.random() * 24,
       life: 1,
-      growRate: 0.12 + Math.random() * 0.2,
-      fadeRate: 0.0025 + Math.random() * 0.003,
+      growRate: 0.2 + Math.random() * 0.28,
+      fadeRate: 0.0018 + Math.random() * 0.0022,
       turniness: 0.03 + Math.random() * 0.06,
       breedCooldown: 220 + Math.random() * 180,
     });
@@ -183,7 +183,7 @@ function updateGrazers() {
         const dy = t.y - z.y;
         if (dx * dx + dy * dy < rr * rr) nearbyTips++;
       }
-      if (nearbyTips > 10 && Math.random() < 0.12) {
+      if (nearbyTips > 8 && Math.random() < 0.28) {
         const ang = Math.random() * Math.PI * 2;
         const spd = 0.18 + Math.random() * 0.35;
         newborn.push({
@@ -199,10 +199,10 @@ function updateGrazers() {
           growRate: 0.1 + Math.random() * 0.15,
           fadeRate: z.fadeRate * (1.05 + Math.random() * 0.3),
           turniness: z.turniness,
-          breedCooldown: 260 + Math.random() * 220,
+          breedCooldown: 130 + Math.random() * 130,
         });
       }
-      z.breedCooldown = 200 + Math.random() * 220;
+      z.breedCooldown = 95 + Math.random() * 110;
     }
 
     // Grazer body (small circular unit)
@@ -271,7 +271,7 @@ function updatePredators() {
 
       if (d < 8) {
         // eat grazer
-        target.life -= 0.35;
+        target.life -= 0.22;
         p.hunger = Math.max(0, p.hunger - 0.45);
         p.life = Math.min(1.2, p.life + 0.04);
       }
@@ -350,10 +350,10 @@ function step() {
     const localN = density.get(`${cx},${cy}`) || 0;
     const competition = Math.max(0, (localN - 7) * 0.03);
 
-    t.grazed = Math.max(0, t.grazed * 0.9 + grazeExposure * 0.75);
+    t.grazed = Math.max(0, t.grazed * 0.88 + grazeExposure * 1.05);
     if (t.grazed > 0.05) {
-      t.energy -= 0.85 * t.grazed;
-      t.width *= 1 - 0.0038 * t.grazed;
+      t.energy -= 1.25 * t.grazed;
+      t.width *= 1 - 0.0052 * t.grazed;
     }
 
     if (competition > 0) {
