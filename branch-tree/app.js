@@ -154,5 +154,19 @@ function loop() {
 ui.resetBtn.addEventListener('click', reset);
 window.addEventListener('resize', reset);
 
+canvas.addEventListener('pointerdown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  // Spawn a small cluster so clicks feel impactful
+  const sprouts = 1 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < sprouts; i++) {
+    const jx = (Math.random() * 2 - 1) * 18;
+    const jy = (Math.random() * 2 - 1) * 10;
+    spawnTree(x + jx, y + jy, 0.75 + Math.random() * 0.45);
+  }
+});
+
 reset();
 requestAnimationFrame(loop);
