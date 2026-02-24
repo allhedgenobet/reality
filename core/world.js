@@ -408,83 +408,90 @@ export function createWorld(rng) {
     return out;
   }
 
-  // Simple soft-body collisions: dynamic creatures gently push each other apart
+  // Simple soft-body collisions using typed lanes (phase 5 foundation).
   function collisionSystem(dt) {
     const { position, velocity, agent, predator, apex, coral, titan } = ecs.components;
-    const entities = [];
 
-    // Collect dynamic entities with an approximate radius
-    for (const [id, ag] of agent.entries()) {
+    const total = agent.size + predator.size + apex.size + coral.size + titan.size;
+    if (total <= 1) return;
+
+    const ids = new Uint32Array(total);
+    const xs = new Float32Array(total);
+    const ys = new Float32Array(total);
+    const rs = new Float32Array(total);
+    const vels = new Array(total);
+
+    let n = 0;
+    const push = (id, radius) => {
       const pos = position.get(id);
       const vel = velocity.get(id);
-      if (!pos || !vel) continue;
-      const energy = ag.energy ?? 1;
-      const radius = 4 + energy * 2;
-      entities.push({ id, pos, vel, radius });
-    }
-    for (const [id, pred] of predator.entries()) {
-      const pos = position.get(id);
-      const vel = velocity.get(id);
-      if (!pos || !vel) continue;
-      const energy = pred.energy ?? 1.5;
-      const radius = 6 + energy * 2.5;
-      entities.push({ id, pos, vel, radius });
-    }
-    for (const [id, ap] of apex.entries()) {
-      const pos = position.get(id);
-      const vel = velocity.get(id);
-      if (!pos || !vel) continue;
-      const energy = ap.energy ?? 3;
-      const radius = 9 + energy * 2;
-      entities.push({ id, pos, vel, radius });
-    }
-    for (const [id, cr] of coral.entries()) {
-      const pos = position.get(id);
-      const vel = velocity.get(id);
-      if (!pos || !vel) continue;
-      const energy = cr.energy ?? 1.5;
-      const radius = 5 + energy * 2;
-      entities.push({ id, pos, vel, radius });
-    }
-    for (const [id, tt] of titan.entries()) {
-      const pos = position.get(id);
-      const vel = velocity.get(id);
-      if (!pos || !vel) continue;
-      const energy = tt.energy ?? 4;
-      const radius = 10 + energy * 2.2;
-      entities.push({ id, pos, vel, radius });
+      if (!pos || !vel) return;
+      ids[n] = id;
+      xs[n] = pos.x;
+      ys[n] = pos.y;
+      rs[n] = radius;
+      vels[n] = vel;
+      n += 1;
+    };
+
+    for (const [id, ag] of agent.entries()) push(id, 4 + (ag.energy ?? 1) * 2);
+    for (const [id, pred] of predator.entries()) push(id, 6 + (pred.energy ?? 1.5) * 2.5);
+    for (const [id, ap] of apex.entries()) push(id, 9 + (ap.energy ?? 3) * 2);
+    for (const [id, cr] of coral.entries()) push(id, 5 + (cr.energy ?? 1.5) * 2);
+    for (const [id, tt] of titan.entries()) push(id, 10 + (tt.energy ?? 4) * 2.2);
+
+    if (n <= 1) return;
+
+    const strength = 40;
+    const cell = SPATIAL_CELL;
+    const grid = new Map();
+
+    for (let i = 0; i < n; i++) {
+      const cx = Math.floor(xs[i] / cell);
+      const cy = Math.floor(ys[i] / cell);
+      const key = `${cx},${cy}`;
+      let bucket = grid.get(key);
+      if (!bucket) {
+        bucket = [];
+        grid.set(key, bucket);
+      }
+      bucket.push(i);
     }
 
-    const strength = 40; // how strongly overlaps push
-    const maxRadius = 20;
-    const collisionGrid = buildSpatialIndex(entities, maxRadius);
+    for (let i = 0; i < n; i++) {
+      const cx = Math.floor(xs[i] / cell);
+      const cy = Math.floor(ys[i] / cell);
 
-    for (let i = 0; i < entities.length; i++) {
-      const a = entities[i];
-      const nearby = querySpatial(collisionGrid, a.pos.x, a.pos.y, a.radius + maxRadius);
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          const bucket = grid.get(`${cx + ox},${cy + oy}`);
+          if (!bucket) continue;
 
-      for (const b of nearby) {
-        if (b.id <= a.id) continue; // process each pair once
+          for (const j of bucket) {
+            if (j <= i) continue;
 
-        const dx = b.pos.x - a.pos.x;
-        const dy = b.pos.y - a.pos.y;
-        const dist2 = dx * dx + dy * dy;
-        if (dist2 <= 0) continue;
+            const dx = xs[j] - xs[i];
+            const dy = ys[j] - ys[i];
+            const dist2 = dx * dx + dy * dy;
+            if (dist2 <= 0) continue;
 
-        const minDist = a.radius + b.radius;
-        if (dist2 >= minDist * minDist) continue;
+            const minDist = rs[i] + rs[j];
+            if (dist2 >= minDist * minDist) continue;
 
-        const dist = Math.sqrt(dist2) || 1;
-        const overlap = (minDist - dist) / minDist;
-        const nx = dx / dist;
-        const ny = dy / dist;
-        const impulse = strength * overlap;
+            const dist = Math.sqrt(dist2) || 1;
+            const overlap = (minDist - dist) / minDist;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const impulse = strength * overlap;
 
-        // Push velocities apart
-        a.vel.vx -= nx * impulse * dt;
-        a.vel.vy -= ny * impulse * dt;
-        b.vel.vx += nx * impulse * dt;
-        b.vel.vy += ny * impulse * dt;
+            const va = vels[i];
+            const vb = vels[j];
+            va.vx -= nx * impulse * dt;
+            va.vy -= ny * impulse * dt;
+            vb.vx += nx * impulse * dt;
+            vb.vy += ny * impulse * dt;
+          }
+        }
       }
     }
   }
