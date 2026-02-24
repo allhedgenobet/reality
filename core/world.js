@@ -543,6 +543,25 @@ export function createWorld(rng) {
     }
     const apexGrid = buildSpatialIndex(apexList, 0);
 
+    // Phase 5 typed lanes for mover species (reduces iterator/object churn in hot steering loops)
+    const predatorIds = new Uint32Array(predator.size);
+    const predatorPos = new Array(predator.size);
+    const predatorVel = new Array(predator.size);
+    const predatorDna = new Array(predator.size);
+    const predatorRest = new Float32Array(predator.size);
+    let predatorN = 0;
+    for (const [id, pred] of predator.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      predatorIds[predatorN] = id;
+      predatorPos[predatorN] = pos;
+      predatorVel[predatorN] = vel;
+      predatorDna[predatorN] = pred.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      predatorRest[predatorN] = pred.rest || 0;
+      predatorN++;
+    }
+
     for (const [id, ag] of agent.entries()) {
       const pos = position.get(id);
       const vel = velocity.get(id);
@@ -600,17 +619,14 @@ export function createWorld(rng) {
       vel.vy += ay * dt;
     }
 
-    // Predators seek nearest agents
+    // Predators seek nearest agents (typed-lane iteration)
     const predatorSeekRadius = 200;
-    for (const [id, pred] of predator.entries()) {
-      const pos = position.get(id);
-      const vel = velocity.get(id);
-      if (!pos || !vel) continue;
+    for (let pi = 0; pi < predatorN; pi++) {
+      if (predatorRest[pi] > 0) continue;
 
-      // Resting predators drift but do not aggressively seek
-      if (pred.rest && pred.rest > 0) continue;
-
-      const dna = pred.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      const pos = predatorPos[pi];
+      const vel = predatorVel[pi];
+      const dna = predatorDna[pi];
       const seekRadius = predatorSeekRadius * dna.sense;
 
       // Aggression index: how hard they commit to targets
@@ -637,7 +653,7 @@ export function createWorld(rng) {
         const desiredSpeed = 60 * dna.speed * (0.8 + aggression * 0.25);
         const desiredVx = (dx / dist) * desiredSpeed;
         const desiredVy = (dy / dist) * desiredSpeed;
-        const blend = 0.65 + aggression * 0.1; // more aggressive → more steering override
+        const blend = 0.65 + aggression * 0.1;
         vel.vx = vel.vx * blend + desiredVx * (1 - blend);
         vel.vy = vel.vy * blend + desiredVy * (1 - blend);
       }
