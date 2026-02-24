@@ -19,8 +19,8 @@ let snapshotMs = 50; // adaptive snapshot cadence
 let lastSnapshotAt = 0;
 
 function isExtinct(currentWorld) {
-  const { agent, predator, apex, coral, titan } = currentWorld.ecs.components;
-  return agent.size === 0 && predator.size === 0 && apex.size === 0 && coral.size === 0 && titan.size === 0;
+  const { agent, predator, apex, coral, titan, decomposer } = currentWorld.ecs.components;
+  return agent.size === 0 && predator.size === 0 && apex.size === 0 && coral.size === 0 && titan.size === 0 && decomposer.size === 0;
 }
 
 function resetWorld() {
@@ -66,6 +66,7 @@ function buildSnapshot() {
       apex: toListWithVelocity(c.apex, c.position, c.velocity, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
       coral: toListWithVelocity(c.coral, c.position, c.velocity, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age, dna: d.dna ? { venom: d.dna.venom } : undefined })),
       titan: toListWithVelocity(c.titan, c.position, c.velocity, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
+      decomposer: toListWithVelocity(c.decomposer, c.position, c.velocity, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
       burst: toList(c.burst, c.position, (d) => ({ life: d.life, hue: d.hue })),
       resource: toList(c.resource, c.position, (d) => ({ kind: d.kind, amount: d.amount, age: d.age, cycles: d.cycles, dna: d.dna })),
       forceField: toList(c.forceField, c.position, (d) => ({ strength: d.strength, radius: d.radius })),
@@ -73,7 +74,7 @@ function buildSnapshot() {
   };
 }
 
-const DELTA_COMPONENTS = ['agent', 'predator', 'apex', 'coral', 'titan', 'burst', 'resource', 'forceField'];
+const DELTA_COMPONENTS = ['agent', 'predator', 'apex', 'coral', 'titan', 'decomposer', 'burst', 'resource', 'forceField'];
 let prevSnapshot = null;
 let lastFullAt = 0;
 const FULL_SNAPSHOT_MS = 2000;
@@ -163,7 +164,7 @@ function postSnapshot(now, force = false) {
 
 function getCreatureCount() {
   const c = world.ecs.components;
-  return c.agent.size + c.predator.size + c.apex.size + c.coral.size + c.titan.size;
+  return c.agent.size + c.predator.size + c.apex.size + c.coral.size + c.titan.size + c.decomposer.size;
 }
 
 function updateLodControls() {

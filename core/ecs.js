@@ -12,6 +12,7 @@ export function createEcs() {
     apex: new Map(),     // { colorHue, energy, age, rest, dna }
     coral: new Map(),    // { colorHue, energy, age, rest, dna } – middle-tier predator
     titan: new Map(),    // { colorHue, energy, age, rest, dna } – apex-eater
+    decomposer: new Map(), // { colorHue, energy, age, dna } – turns waste into nutrients
     burst: new Map(),    // transient burst particles { vx, vy, life, hue }
     resource: new Map(), // { kind, amount, regenTimer, age, cycles, seedTimer }
     forceField: new Map(), // { strength, radius }
