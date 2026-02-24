@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neuro Pathways Sandbox</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Neuro Pathways Sandbox</h1>
+      <p>Brain-inspired decision pathways with simple plasticity + reward feedback.</p>
+    </header>
+
+    <section class="controls">
+      <button id="stepBtn">Step</button>
+      <button id="runBtn">Pause</button>
+      <button id="resetBtn">Reset</button>
+
+      <label>
+        Stimulus A
+        <input id="stimA" type="range" min="0" max="1" step="0.01" value="0.8" />
+      </label>
+      <label>
+        Stimulus B
+        <input id="stimB" type="range" min="0" max="1" step="0.01" value="0.2" />
+      </label>
+      <label>
+        Noise
+        <input id="noise" type="range" min="0" max="0.4" step="0.01" value="0.08" />
+      </label>
+      <label>
+        Learning rate
+        <input id="eta" type="range" min="0" max="0.2" step="0.005" value="0.04" />
+      </label>
+      <label>
+        Inhibition
+        <input id="inhib" type="range" min="0" max="1.5" step="0.05" value="0.6" />
+      </label>
+      <label>
+        <input id="rewardTargetA" type="checkbox" checked /> Reward Choice A
+      </label>
+    </section>
+
+    <section class="stats">
+      <div id="tickLabel">Tick: 0</div>
+      <div id="choiceLabel">Choice: -</div>
+      <div id="rewardLabel">Reward: 0</div>
+      <div id="accLabel">A-win rate (100): 0%</div>
+    </section>
+
+    <canvas id="view" width="1000" height="620"></canvas>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
