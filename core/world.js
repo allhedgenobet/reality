@@ -37,6 +37,8 @@ export function createWorld(rng) {
   const CORAL_COUNT = 0;
   const TITAN_COUNT = 0;
   const RESOURCE_COUNT = 2200;
+  const MAX_AMBIENT_RESOURCES = RESOURCE_COUNT + 400;
+  let ambientPlantTimer = 2 + rng.float() * 3;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -1137,6 +1139,12 @@ export function createWorld(rng) {
   function ecologySystem(dt) {
     const { resource, position } = ecs.components;
     const fertility = world.globals.fertility;
+
+    ambientPlantTimer -= dt;
+    if (ambientPlantTimer <= 0 && resource.size < MAX_AMBIENT_RESOURCES) {
+      ambientPlantTimer = 3 + rng.float() * 3;
+      makeResource(rng.float() * width, rng.float() * height, 'plant');
+    }
 
     // Global pod count for limiting explosive growth
     let podCount = 0;

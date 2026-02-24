@@ -56,9 +56,8 @@ export function createRenderer(canvas) {
     const stormSatBoost = isStorm ? 10 : 0;
     const stormLightShift = isStorm ? 5 : 0;
 
-    // Trails: soft fade instead of hard clear
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
-    ctx.fillRect(0, 0, canvasW, canvasH);
+    // Clear fully each frame to avoid lingering trails
+    ctx.clearRect(0, 0, canvasW, canvasH);
 
     // Background "fog" gradient instead of grid
     const fog = ctx.createRadialGradient(
