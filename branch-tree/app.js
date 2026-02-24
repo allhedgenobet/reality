@@ -16,8 +16,10 @@ let nutrients;
 
 let tips = [];
 let segments = 0;
-let grazers = [];
-let predators = [];
+
+/* =========================
+   SETUP
+========================= */
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
@@ -52,7 +54,7 @@ function updateNutrients() {
 }
 
 /* =========================
-   GENETICS + HERITAGE COLOR
+   GENETICS
 ========================= */
 
 function createBaseGenes() {
@@ -74,7 +76,6 @@ function createBaseGenes() {
 }
 
 function mutateGenes(p, m = 0.1) {
-
   let heritageHue = p.heritageHue;
   let drift = clamp(
     p.hueDrift + (Math.random() * 2 - 1) * m * 3,
@@ -82,7 +83,7 @@ function mutateGenes(p, m = 0.1) {
     35
   );
 
-  // 👽 SPECIES EVENT (alien civilization moment)
+  // ALIEN SPECIATION EVENT
   if (Math.random() < 0.0005) {
     heritageHue = (heritageHue + 50 + Math.random() * 80) % 360;
     drift = 0;
@@ -116,7 +117,6 @@ class Tip {
     this.width=w;
     this.energy=e;
     this.genes=g;
-    this.grazed=0;
     this.alive=true;
   }
 }
@@ -138,25 +138,17 @@ function reset(){
   ctx.fillStyle='#000';
   ctx.fillRect(0,0,window.innerWidth,window.innerHeight);
   tips=[];
-  grazers=[];
-  predators=[];
   segments=0;
 }
 
 /* =========================
-        RENDERING
+   DRAW
 ========================= */
 
-function drawSegment(x1,y1,x2,y2,w,g,graze=0){
+function drawSegment(x1,y1,x2,y2,w,g){
+  const hue = g.heritageHue*0.7 + g.hue*0.3;
 
-  // lineage dominates color
-  const hue =
-    g.heritageHue * 0.7 +
-    g.hue * 0.3;
-
-  ctx.strokeStyle =
-    `hsla(${hue},100%,65%,0.78)`;
-
+  ctx.strokeStyle = `hsla(${hue},100%,65%,0.78)`;
   ctx.lineWidth = w;
   ctx.beginPath();
   ctx.moveTo(x1,y1);
@@ -164,9 +156,11 @@ function drawSegment(x1,y1,x2,y2,w,g,graze=0){
   ctx.stroke();
 }
 
-/* ========================= */
+/* =========================
+   SIMULATION STEP
+========================= */
 
-function step(){
+function step() {
 
   updateNutrients();
 
@@ -174,16 +168,16 @@ function step(){
   const stopChance = Number(ui.stopChance.value);
   const wind = Number(ui.wind.value);
 
-  const newTips=[];
+  const newTips = [];
 
-  for(const t of tips){
-    if(!t.alive) continue;
+  for (const t of tips) {
+
+    if (!t.alive) continue;
 
     const g = t.genes;
-
     const idx = occIndex(t.x,t.y);
 
-    // ENERGY FROM ENVIRONMENT
+    // energy from nutrients
     const food = nutrients[idx];
     t.energy += 0.18 * food;
     nutrients[idx] *= 0.92;
@@ -191,15 +185,12 @@ function step(){
     const ageStop =
       (1 - Math.min(1,t.energy/320))*0.028;
 
-    const effectiveStop =
-      (stopChance + ageStop) * g.stopBias;
+    if (Math.random() < (stopChance+ageStop)*g.stopBias || t.energy <= 0) {
 
-    if(Math.random()<effectiveStop || t.energy<=0){
+      t.alive = false;
 
-      t.alive=false;
-
-      // reseed after death
-      if(Math.random()<0.02){
+      // reseed on death
+      if (Math.random() < 0.02) {
         spawnTree(t.x,t.y,0.45,g);
       }
 
@@ -213,20 +204,19 @@ function step(){
       g.curl*Math.sin((t.x+t.y)*0.01);
 
     const stepLen = 1.2;
-
     const nx = t.x + Math.cos(t.angle)*stepLen;
     const ny = t.y + Math.sin(t.angle)*stepLen;
 
     const nidx = occIndex(nx,ny);
 
     // SOFT OCCUPANCY
-    if(occupancy[nidx] >= 3){
+    if (occupancy[nidx] >= 3) {
       t.angle += (Math.random()*2-1)*1.2;
       t.energy *= 0.97;
       continue;
     }
 
-    drawSegment(t.x,t.y,nx,ny,t.width,g,t.grazed);
+    drawSegment(t.x,t.y,nx,ny,t.width,g);
 
     occupancy[nidx]++;
     segments++;
@@ -237,70 +227,62 @@ function step(){
     t.energy -= 0.65;
     t.width *= 0.999;
 
-    // evolutionary pressure
-    if(Math.random()<0.01){
-      g.branchBias *= 1.001;
-    }
+    /* ===== NORMAL BRANCHING ===== */
 
-    if(Math.random()<branchChance*0.88*g.branchBias && t.energy>15){
-      // =========================
-// AGGRESSIVE TREE REPRODUCTION
-// =========================
+    if (Math.random() < branchChance*0.88*g.branchBias && t.energy > 15) {
 
-// nutrient-rich + energetic tips reproduce more
-const localFood = nutrients[idx];
-
-// base chance (much higher than before)
-let reproduceChance =
-  0.006 *                // BIG increase
-  g.vigor *
-  (0.5 + localFood) *
-  (t.energy / 120);
-
-// occasional burst events (forest explosions)
-if (Math.random() < 0.0008) {
-  reproduceChance *= 8;
-}
-
-if (Math.random() < reproduceChance && t.energy > 8) {
-
-  const count = 1 + (Math.random() < 0.35 ? 1 : 0);
-
-  for (let i = 0; i < count; i++) {
-    const ang = Math.random() * Math.PI * 2;
-    const dist = 10 + Math.random() * 45;
-
-    const sx = t.x + Math.cos(ang) * dist;
-    const sy = t.y + Math.sin(ang) * dist;
-
-    spawnTree(sx, sy, 0.55 + Math.random() * 0.45, g);
-  }
-
-  // reproduction cost (prevents runaway explosion)
-  t.energy *= 0.82;
-}
       const split = Math.PI*0.5*(0.75+Math.random()*0.35);
 
       newTips.push(
-        new Tip(t.x,t.y,
-          t.angle-split,
+        new Tip(t.x,t.y,t.angle-split,
           t.width*0.75,
           t.energy*0.63,
-          mutateGenes(g,0.08)
-        )
+          mutateGenes(g,0.08))
       );
 
       newTips.push(
-        new Tip(t.x,t.y,
-          t.angle+split,
+        new Tip(t.x,t.y,t.angle+split,
           t.width*0.75,
           t.energy*0.63,
-          mutateGenes(g,0.08)
-        )
+          mutateGenes(g,0.08))
       );
 
       t.energy *= 0.72;
     }
+
+    /* ===== HIGH REPRODUCTION (NEW TREES) ===== */
+
+    const localFood = nutrients[idx];
+
+    let reproduceChance =
+      0.006 *
+      g.vigor *
+      (0.5 + localFood) *
+      (t.energy / 120);
+
+    // burst seeding events
+    if (Math.random() < 0.0008) {
+      reproduceChance *= 8;
+    }
+
+    if (Math.random() < reproduceChance && t.energy > 8) {
+
+      const count = 1 + (Math.random() < 0.35 ? 1 : 0);
+
+      for (let i=0;i<count;i++) {
+
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 10 + Math.random() * 45;
+
+        const sx = t.x + Math.cos(ang)*dist;
+        const sy = t.y + Math.sin(ang)*dist;
+
+        spawnTree(sx,sy,0.55+Math.random()*0.45,g);
+      }
+
+      t.energy *= 0.82;
+    }
+
   }
 
   tips.push(...newTips);
@@ -310,15 +292,15 @@ if (Math.random() < reproduceChance && t.energy > 8) {
     `tips:${tips.length}  segments:${segments}`;
 }
 
-function loop(){
+/* ========================= */
 
-  // SUPER SLOW FADE (history preserved)
+function loop() {
+
+  // VERY SLOW FADE (history preserved)
   ctx.fillStyle='rgba(0,0,0,0.002)';
   ctx.fillRect(0,0,window.innerWidth,window.innerHeight);
 
-  if(tips.length>0){
-    step();
-  }
+  if (tips.length > 0) step();
 
   requestAnimationFrame(loop);
 }
@@ -327,6 +309,7 @@ ui.resetBtn.addEventListener('click',reset);
 window.addEventListener('resize',reset);
 
 canvas.addEventListener('pointerdown',(e)=>{
+
   const r = canvas.getBoundingClientRect();
   const x = e.clientX - r.left;
   const y = e.clientY - r.top;
