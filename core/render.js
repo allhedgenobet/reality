@@ -544,23 +544,42 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Draw decomposers as low-glow teal motes
+    // Draw decomposers as segmented worm shapes
     for (const [id, dc] of decomposer.entries()) {
       const pos = position.get(id);
       if (!pos) continue;
       const hue = (dc.colorHue ?? 120) + wobbleHue + stormHueShift;
       const energy = dc.energy ?? 1;
       const age = dc.age ?? 0;
-      const radius = 3 + Math.min(2.2, energy * 1.6) + (age > 15 ? 0.6 : 0);
+      const segR = 2.5 + Math.min(1.6, energy * 1.2) + (age > 15 ? 0.5 : 0);
 
-      ctx.fillStyle = `hsla(${hue}, ${70 + wobbleSat + stormSatBoost}%, ${60 + wobbleLight + stormLightShift}%, 0.9)`;
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-      ctx.fill();
+      // Determine worm orientation from velocity
+      const vel = ecs.components.velocity.get(id);
+      const facing = vel && (Math.abs(vel.vx) + Math.abs(vel.vy) > 0.5)
+        ? Math.atan2(vel.vy, vel.vx)
+        : (id * 0.9 + world.tick * 0.008);
+
+      // Draw 3 segments along the worm body
+      const segCount = 3;
+      const segSpacing = segR * 1.6;
+      for (let s = 0; s < segCount; s++) {
+        const t = s / (segCount - 1); // 0 = head, 1 = tail
+        const sx = pos.x - Math.cos(facing) * segSpacing * s;
+        const sy = pos.y - Math.sin(facing) * segSpacing * s;
+        const r = segR * (1 - t * 0.35); // taper toward tail
+        const alpha = 0.92 - t * 0.2;
+        const lightShift = t * 8;
+        ctx.fillStyle = `hsla(${hue}, ${70 + wobbleSat + stormSatBoost}%, ${60 - lightShift + wobbleLight + stormLightShift}%, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Glow ring around head
       ctx.strokeStyle = `hsla(${hue + 40}, 85%, 80%, 0.4)`;
       ctx.lineWidth = 0.8;
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, radius + 1.5, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y, segR + 1.5, 0, Math.PI * 2);
       ctx.stroke();
     }
 

@@ -891,7 +891,17 @@ export function createWorld(rng) {
       }
     }
 
-    // Decomposers drift toward depleted resources to recycle nutrients
+    // Build dead-resource index for decomposer worm targeting
+    const deadResourceList = [];
+    for (const [id, res] of resource.entries()) {
+      if ((res.amount ?? 1) > 0) continue;
+      const pos = position.get(id);
+      if (!pos) continue;
+      deadResourceList.push({ id, pos, data: res });
+    }
+    const deadResourceGrid = buildSpatialIndex(deadResourceList, 0);
+
+    // Decomposer worms: seek dead trees first, fall back to depleted resources
     const decomposerSeekRadius = 160;
     for (let di = 0; di < decomposerN; di++) {
       const pos = decomposerPos[di];
@@ -901,15 +911,31 @@ export function createWorld(rng) {
 
       let target = null;
       let targetDist2 = Infinity;
-      const nearbyResources = querySpatial(resourceGrid, pos.x, pos.y, seekRadius);
-      for (const r of nearbyResources) {
-        if ((r.data.amount ?? 1) > 0.75) continue;
+
+      // Prefer completely dead trees (amount === 0)
+      const nearbyDead = querySpatial(deadResourceGrid, pos.x, pos.y, seekRadius);
+      for (const r of nearbyDead) {
         const dx = r.pos.x - pos.x;
         const dy = r.pos.y - pos.y;
         const d2 = dx * dx + dy * dy;
         if (d2 < targetDist2 && d2 < seekRadius * seekRadius) {
           targetDist2 = d2;
           target = r.pos;
+        }
+      }
+
+      // Fall back to depleted (but not yet dead) resources
+      if (!target) {
+        const nearbyResources = querySpatial(resourceGrid, pos.x, pos.y, seekRadius);
+        for (const r of nearbyResources) {
+          if ((r.data.amount ?? 1) > 0.75) continue;
+          const dx = r.pos.x - pos.x;
+          const dy = r.pos.y - pos.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < targetDist2 && d2 < seekRadius * seekRadius) {
+            targetDist2 = d2;
+            target = r.pos;
+          }
         }
       }
 
@@ -962,6 +988,16 @@ export function createWorld(rng) {
       resourceList.push({ id, pos, data: res });
     }
     const resourceGrid = buildSpatialIndex(resourceList, eatRadius);
+
+    // Dead-resource index for decomposer worms (amount === 0)
+    const deadResourceList = [];
+    for (const [id, res] of resource.entries()) {
+      if ((res.amount ?? 1) > 0) continue;
+      const pos = position.get(id);
+      if (!pos) continue;
+      deadResourceList.push({ id, pos, data: res });
+    }
+    const deadResourceGrid = buildSpatialIndex(deadResourceList, 10);
 
     const agentList = [];
     for (const [id, ag] of agent.entries()) {
@@ -1055,7 +1091,7 @@ export function createWorld(rng) {
       }
     }
 
-    // Decomposers recycle depleted resources to regain energy
+    // Decomposer worms: clear dead trees and recycle depleted resources
     const decomposerEatRadius = 10;
     const decomposerDrain = baseDrain * 1.1;
     for (const lane of decomposerLane) {
@@ -1066,18 +1102,38 @@ export function createWorld(rng) {
       dc.energy -= decomposerDrain * dna.metabolism * dt;
       if (dc.energy < 0) dc.energy = 0;
 
-      const nearbyResources = querySpatial(resourceGrid, dpos.x, dpos.y, decomposerEatRadius);
-      for (const r of nearbyResources) {
-        const res = r.data;
-        if (res.amount >= 1) continue;
+      // Primary: destroy completely dead trees and gain energy from decomposition
+      let clearedDead = false;
+      const nearbyDead = querySpatial(deadResourceGrid, dpos.x, dpos.y, decomposerEatRadius);
+      for (const r of nearbyDead) {
+        if (!resource.has(r.id)) continue;
         const rpos = r.pos;
         const dx = rpos.x - dpos.x;
         const dy = rpos.y - dpos.y;
         const d2 = dx * dx + dy * dy;
         if (d2 < decomposerEatRadius * decomposerEatRadius) {
-          const replenish = Math.min(0.45 * dt, 1 - res.amount);
-          res.amount += replenish;
-          dc.energy = Math.min(2.0, dc.energy + replenish * 1.4);
+          ecs.destroyEntity(r.id);
+          dc.energy = Math.min(2.0, dc.energy + 0.5);
+          clearedDead = true;
+          break;
+        }
+      }
+
+      // Secondary: replenish depleted (but not dead) resources
+      if (!clearedDead) {
+        const nearbyResources = querySpatial(resourceGrid, dpos.x, dpos.y, decomposerEatRadius);
+        for (const r of nearbyResources) {
+          const res = r.data;
+          if (res.amount >= 1) continue;
+          const rpos = r.pos;
+          const dx = rpos.x - dpos.x;
+          const dy = rpos.y - dpos.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < decomposerEatRadius * decomposerEatRadius) {
+            const replenish = Math.min(0.45 * dt, 1 - res.amount);
+            res.amount += replenish;
+            dc.energy = Math.min(2.0, dc.energy + replenish * 1.4);
+          }
         }
       }
     }
