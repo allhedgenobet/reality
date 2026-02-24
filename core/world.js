@@ -62,11 +62,6 @@ export function createWorld(rng) {
     burstPool.push(id);
   }
 
-  function canSpawnBursts(requested = 1) {
-    const active = ecs.components.burst.size;
-    return active + requested <= getBurstBudget();
-  }
-
   function makeAgent(x, y, baseHue = 200, parentDna) {
     const id = ecs.createEntity();
     ecs.components.position.set(id, { x, y });
@@ -316,29 +311,6 @@ export function createWorld(rng) {
 
   function makeSeedPod(x, y) {
     return makeResource(x, y, 'pod');
-  }
-
-  function spawnApexBurst(x, y, baseHue, count, energy) {
-    const { position, burst } = ecs.components;
-    const q = world.globals.effectQuality ?? 1;
-    const requested = Math.max(1, Math.round((count || 8) * q));
-    const remaining = Math.max(0, getBurstBudget() - burst.size);
-    const particles = Math.min(requested, remaining);
-    if (particles <= 0) return;
-
-    const speedBase = 40 + energy * 12;
-    for (let i = 0; i < particles; i++) {
-      const id = acquireBurstEntity();
-      const angle = rng.float() * Math.PI * 2;
-      const speed = speedBase * (0.6 + rng.float() * 0.8);
-      position.set(id, { x, y });
-      burst.set(id, {
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 1.4 + rng.float() * 0.6,
-        hue: baseHue,
-      });
-    }
   }
 
   for (let i = 0; i < AGENT_COUNT; i++) {
@@ -1142,7 +1114,6 @@ export function createWorld(rng) {
     const predEatRadius = 9;
     const predDrain = baseDrain * 1.9;
     for (const lane of predatorLane) {
-      const pid = lane.id;
       const pred = lane.pred;
       const ppos = lane.pos;
       const dna = pred.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
@@ -1162,7 +1133,6 @@ export function createWorld(rng) {
       const nearbyAgents = querySpatial(agentGrid, ppos.x, ppos.y, predEatRadius);
       for (const prey of nearbyAgents) {
         const aid = prey.id;
-        const ag = prey.data;
         if (!agent.has(aid)) continue;
         const apos = prey.pos;
         const dx = apos.x - ppos.x;
@@ -1200,7 +1170,6 @@ export function createWorld(rng) {
     const apexDrain = baseDrain * 1.1;
     const VENOM_ENERGY_PENALTY = 0.5; // fraction by which high-venom coral reduces apex energy gain
     for (const lane of apexLane) {
-      const aid = lane.id;
       const ap = lane.ap;
       const apos = lane.pos;
       const dna = ap.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
@@ -1259,7 +1228,6 @@ export function createWorld(rng) {
     const titanEatRadius = 13;
     const titanDrain = baseDrain * 1.25;
     for (const lane of titanLane) {
-      const tid = lane.id;
       const tt = lane.tt;
       const tpos = lane.pos;
       const dna = tt.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
@@ -1293,7 +1261,6 @@ export function createWorld(rng) {
     const coralEatRadius = 8;
     const coralDrain = baseDrain * 1.5;
     for (const lane of coralLane) {
-      const cid = lane.id;
       const cr = lane.cr;
       const cpos = lane.pos;
       const dna = cr.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0, venom: 0 };
@@ -1309,7 +1276,6 @@ export function createWorld(rng) {
       const nearbyAgents = querySpatial(agentGrid, cpos.x, cpos.y, coralEatRadius);
       for (const prey of nearbyAgents) {
         const aid = prey.id;
-        const ag = prey.data;
         if (!agent.has(aid)) continue;
         const apos = prey.pos;
         const dx = apos.x - cpos.x;
@@ -1350,7 +1316,7 @@ export function createWorld(rng) {
     ambientPlantTimer -= dt;
     if (ambientPlantTimer <= 0 && resource.size < MAX_AMBIENT_RESOURCES) {
       ambientPlantTimer = 3 + rng.float() * 3;
-      makeResource(rng.float() * width, rng.float() * height, 'plant');
+      makePlant(rng.float() * width, rng.float() * height);
     }
 
     // Global pod count for limiting explosive growth
@@ -1621,7 +1587,7 @@ export function createWorld(rng) {
     const targetStorm = Math.max(0, Math.min(1, scarcity * 0.6 + pressure * 0.25 + chaosBias));
 
     // Smooth toward target.
-    world.globals.storminess += (targetStorm - world.globals.storminess) * 0.05;
+    world.globals.storminess += (targetStorm - world.globals.storminess) * (1 - Math.exp(-3 * dt));
 
     // Map storminess to metabolism and regime label.
     const s = world.globals.storminess;
@@ -1655,7 +1621,7 @@ export function createWorld(rng) {
 
     // Try to reuse a nearby field instead of spamming new ones
     let targetId = null;
-    for (const [id, field] of forceField.entries()) {
+    for (const id of forceField.keys()) {
       const pos = position.get(id);
       if (!pos) continue;
       const dx = pos.x - point.x;
