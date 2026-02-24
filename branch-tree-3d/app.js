@@ -88,12 +88,7 @@ function seedForest() {
     child.geometry.dispose();
   }
 
-  const count = 6;
-  for (let i = 0; i < count; i++) {
-    const x = -80 + i * 30 + (Math.random() * 2 - 1) * 8;
-    const z = (Math.random() * 2 - 1) * 35;
-    spawnTree(x, z, 0.9 + Math.random() * 0.45);
-  }
+  spawnTree(0, 0, 1.0);
 }
 
 function randomCone(base, spread = 0.35) {
