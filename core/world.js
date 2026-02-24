@@ -42,6 +42,28 @@ export function createWorld(rng) {
     return Math.max(min, Math.min(max, value));
   }
 
+  const burstPool = [];
+
+  function getBurstBudget() {
+    const q = world.globals.effectQuality ?? 1;
+    return Math.max(60, Math.round(420 * q));
+  }
+
+  function acquireBurstEntity() {
+    return burstPool.pop() ?? ecs.createEntity();
+  }
+
+  function recycleBurstEntity(id) {
+    ecs.components.burst.delete(id);
+    ecs.components.position.delete(id);
+    burstPool.push(id);
+  }
+
+  function canSpawnBursts(requested = 1) {
+    const active = ecs.components.burst.size;
+    return active + requested <= getBurstBudget();
+  }
+
   function makeAgent(x, y, baseHue = 200, parentDna) {
     const id = ecs.createEntity();
     ecs.components.position.set(id, { x, y });
@@ -264,10 +286,14 @@ export function createWorld(rng) {
   function spawnApexBurst(x, y, baseHue, count, energy) {
     const { position, burst } = ecs.components;
     const q = world.globals.effectQuality ?? 1;
-    const particles = Math.max(1, Math.round((count || 8) * q));
+    const requested = Math.max(1, Math.round((count || 8) * q));
+    const remaining = Math.max(0, getBurstBudget() - burst.size);
+    const particles = Math.min(requested, remaining);
+    if (particles <= 0) return;
+
     const speedBase = 40 + energy * 12;
     for (let i = 0; i < particles; i++) {
-      const id = ecs.createEntity();
+      const id = acquireBurstEntity();
       const angle = rng.float() * Math.PI * 2;
       const speed = speedBase * (0.6 + rng.float() * 0.8);
       position.set(id, { x, y });
@@ -844,13 +870,13 @@ export function createWorld(rng) {
         const d2 = dx * dx + dy * dy;
         if (d2 < predEatRadius * predEatRadius) {
           // Spawn small "absorption" particles from prey toward predator
-          const particles = Math.max(1, Math.round(4 * (world.globals.effectQuality ?? 1)));
+          const requested = Math.max(1, Math.round(4 * (world.globals.effectQuality ?? 1)));
+          const particles = Math.min(requested, Math.max(0, getBurstBudget() - burst.size));
           const hue = pred.colorHue ?? 30;
           const baseSpeed = 70;
           for (let i = 0; i < particles; i++) {
-            const id = ecs.createEntity();
-            const posId = id;
-            position.set(posId, { x: apos.x, y: apos.y });
+            const id = acquireBurstEntity();
+            position.set(id, { x: apos.x, y: apos.y });
             const vx = (ppos.x - apos.x) * (0.8 + rng.float() * 0.5);
             const vy = (ppos.y - apos.y) * (0.8 + rng.float() * 0.5);
             burst.set(id, {
@@ -989,11 +1015,12 @@ export function createWorld(rng) {
         const d2 = dx * dx + dy * dy;
         if (d2 < coralEatRadius * coralEatRadius) {
           // Spawn absorption particles
-          const particles = Math.max(1, Math.round(3 * (world.globals.effectQuality ?? 1)));
+          const requested = Math.max(1, Math.round(3 * (world.globals.effectQuality ?? 1)));
+          const particles = Math.min(requested, Math.max(0, getBurstBudget() - burst.size));
           const hue = cr.colorHue ?? 340;
           const baseSpeed = 60;
           for (let i = 0; i < particles; i++) {
-            const pid = ecs.createEntity();
+            const pid = acquireBurstEntity();
             position.set(pid, { x: apos.x, y: apos.y });
             const vx = (cpos.x - apos.x) * (0.8 + rng.float() * 0.5);
             const vy = (cpos.y - apos.y) * (0.8 + rng.float() * 0.5);
@@ -1212,11 +1239,11 @@ export function createWorld(rng) {
       }
     }
 
-    // Fade and clean up burst particles
+    // Fade and clean up burst particles (recycle IDs via pool)
     for (const [id, p] of Array.from(burst.entries())) {
       p.life -= dt;
       if (p.life <= 0) {
-        ecs.destroyEntity(id);
+        recycleBurstEntity(id);
       }
     }
 
