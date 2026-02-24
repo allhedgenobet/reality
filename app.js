@@ -162,7 +162,14 @@ function updateGrazers() {
   const newborn = [];
 
   for (const z of grazers) {
-    z.r = Math.min(z.maxR, z.r + z.growRate);
+    // Grow bigger when actively eating tips
+    let eatGain = 0;
+    for (const t of tips) {
+      const edx = t.x - z.x;
+      const edy = t.y - z.y;
+      if (edx * edx + edy * edy < z.r * z.r) eatGain += 0.06;
+    }
+    z.r = Math.min(z.maxR, z.r + z.growRate + eatGain);
     z.life -= z.fadeRate;
 
     // Wander movement
@@ -177,7 +184,7 @@ function updateGrazers() {
     if (Number.isFinite(z.px) && Number.isFinite(z.py)) {
       ctx.fillStyle = 'rgba(0,0,0,1)';
       ctx.beginPath();
-      ctx.arc(z.px, z.py, 4.2, 0, Math.PI * 2);
+      ctx.arc(z.px, z.py, (z.pBodyR ?? 4.2) + 0.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -222,8 +229,8 @@ function updateGrazers() {
       z.breedCooldown = 95 + Math.random() * 110;
     }
 
-    // Grazer body (small circular unit)
-    const bodyR = 1.6 + z.life * 0.8;
+    // Grazer body: visual size scales with how much it has grown from eating
+    const bodyR = 1.4 + (z.r / z.maxR) * 4.0 + z.life * 0.4;
     ctx.fillStyle = `rgba(245,230,165,${0.55 * z.life + 0.18})`;
     ctx.beginPath();
     ctx.arc(z.x, z.y, bodyR, 0, Math.PI * 2);
@@ -235,6 +242,7 @@ function updateGrazers() {
     ctx.arc(z.x, z.y, bodyR, 0, Math.PI * 2);
     ctx.stroke();
 
+    z.pBodyR = bodyR;
     z.px = z.x;
     z.py = z.y;
   }
