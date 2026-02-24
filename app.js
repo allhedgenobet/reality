@@ -135,10 +135,10 @@ function maybeSpawnGrazersFromDensity() {
   }
 
   for (const [key, count] of counts.entries()) {
-    if (count < 18 || Math.random() > 0.06) continue;
+    if (count < 12 || Math.random() > 0.12) continue;
     const [cx, cy] = key.split(',').map(Number);
     const angle = Math.random() * Math.PI * 2;
-    const speed = 0.35 + Math.random() * 0.7;
+    const speed = 0.65 + Math.random() * 1.0;
     grazers.push({
       x: (cx + 0.5) * cell,
       y: (cy + 0.5) * cell,
@@ -152,7 +152,7 @@ function maybeSpawnGrazersFromDensity() {
       growRate: 0.2 + Math.random() * 0.28,
       fadeRate: 0.0018 + Math.random() * 0.0022,
       turniness: 0.03 + Math.random() * 0.06,
-      breedCooldown: 220 + Math.random() * 180,
+      breedCooldown: 120 + Math.random() * 100,
     });
     break;
   }
@@ -169,7 +169,7 @@ function updateGrazers() {
     z.vx += (Math.random() * 2 - 1) * z.turniness;
     z.vy += (Math.random() * 2 - 1) * z.turniness;
     const vMag = Math.hypot(z.vx, z.vy) || 1;
-    const targetSpeed = 0.22 + z.life * 0.5;
+    const targetSpeed = 0.4 + z.life * 0.8;
     z.vx = (z.vx / vMag) * targetSpeed;
     z.vy = (z.vy / vMag) * targetSpeed;
 
@@ -200,7 +200,7 @@ function updateGrazers() {
         const dy = t.y - z.y;
         if (dx * dx + dy * dy < rr * rr) nearbyTips++;
       }
-      if (nearbyTips > 8 && Math.random() < 0.28) {
+      if (nearbyTips > 8 && Math.random() < 0.45) {
         const ang = Math.random() * Math.PI * 2;
         const spd = 0.18 + Math.random() * 0.35;
         newborn.push({
@@ -216,10 +216,10 @@ function updateGrazers() {
           growRate: 0.1 + Math.random() * 0.15,
           fadeRate: z.fadeRate * (1.05 + Math.random() * 0.3),
           turniness: z.turniness,
-          breedCooldown: 130 + Math.random() * 130,
+          breedCooldown: 70 + Math.random() * 70,
         });
       }
-      z.breedCooldown = 95 + Math.random() * 110;
+      z.breedCooldown = 55 + Math.random() * 70;
     }
 
     // Grazer body (small circular unit)
