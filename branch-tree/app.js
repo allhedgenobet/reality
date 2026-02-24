@@ -118,14 +118,19 @@ function maybeSpawnGrazersFromDensity() {
   for (const [key, count] of counts.entries()) {
     if (count < 18 || Math.random() > 0.06) continue;
     const [cx, cy] = key.split(',').map(Number);
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.35 + Math.random() * 0.7;
     grazers.push({
       x: (cx + 0.5) * cell,
       y: (cy + 0.5) * cell,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
       r: 10,
       maxR: 110 + Math.random() * 40,
       life: 1,
       growRate: 0.65 + Math.random() * 0.8,
       fadeRate: 0.003 + Math.random() * 0.004,
+      turniness: 0.03 + Math.random() * 0.06,
     });
     break;
   }
@@ -135,6 +140,23 @@ function updateGrazers() {
   for (const z of grazers) {
     z.r = Math.min(z.maxR, z.r + z.growRate);
     z.life -= z.fadeRate;
+
+    // Wander movement
+    z.vx += (Math.random() * 2 - 1) * z.turniness;
+    z.vy += (Math.random() * 2 - 1) * z.turniness;
+    const vMag = Math.hypot(z.vx, z.vy) || 1;
+    const targetSpeed = 0.4 + z.life * 0.8;
+    z.vx = (z.vx / vMag) * targetSpeed;
+    z.vy = (z.vy / vMag) * targetSpeed;
+
+    z.x += z.vx;
+    z.y += z.vy;
+
+    // bounce off bounds
+    if (z.x < 0 || z.x > window.innerWidth) z.vx *= -1;
+    if (z.y < 0 || z.y > window.innerHeight) z.vy *= -1;
+    z.x = clamp(z.x, 0, window.innerWidth);
+    z.y = clamp(z.y, 0, window.innerHeight);
 
     const grad = ctx.createRadialGradient(z.x, z.y, 0, z.x, z.y, z.r);
     grad.addColorStop(0, `rgba(255,235,120,${0.16 * z.life})`);
