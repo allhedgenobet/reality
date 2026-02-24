@@ -243,6 +243,42 @@ function step(){
     }
 
     if(Math.random()<branchChance*0.88*g.branchBias && t.energy>15){
+      // =========================
+// AGGRESSIVE TREE REPRODUCTION
+// =========================
+
+// nutrient-rich + energetic tips reproduce more
+const localFood = nutrients[idx];
+
+// base chance (much higher than before)
+let reproduceChance =
+  0.006 *                // BIG increase
+  g.vigor *
+  (0.5 + localFood) *
+  (t.energy / 120);
+
+// occasional burst events (forest explosions)
+if (Math.random() < 0.0008) {
+  reproduceChance *= 8;
+}
+
+if (Math.random() < reproduceChance && t.energy > 8) {
+
+  const count = 1 + (Math.random() < 0.35 ? 1 : 0);
+
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 10 + Math.random() * 45;
+
+    const sx = t.x + Math.cos(ang) * dist;
+    const sy = t.y + Math.sin(ang) * dist;
+
+    spawnTree(sx, sy, 0.55 + Math.random() * 0.45, g);
+  }
+
+  // reproduction cost (prevents runaway explosion)
+  t.energy *= 0.82;
+}
       const split = Math.PI*0.5*(0.75+Math.random()*0.35);
 
       newTips.push(
