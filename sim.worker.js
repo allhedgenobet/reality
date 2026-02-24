@@ -15,7 +15,7 @@ let avgStepMs = 0;
 let fps = 0;
 let frameCounter = 0;
 let fpsWindowStart = performance.now();
-const SNAPSHOT_MS = 50; // ~20Hz snapshot stream to reduce postMessage overhead
+let snapshotMs = 50; // adaptive snapshot cadence
 let lastSnapshotAt = 0;
 
 function isExtinct(currentWorld) {
@@ -48,7 +48,7 @@ function buildSnapshot() {
     height: world.height,
     regime: world.regime,
     camera: world.camera,
-    perf: { fps, avgStepMs, effectQuality: world.globals.effectQuality ?? 1, updateStride: world.globals.updateStride ?? 1 },
+    perf: { fps, avgStepMs, effectQuality: world.globals.effectQuality ?? 1, updateStride: world.globals.updateStride ?? 1, snapshotMs },
     components: {
       agent: toList(c.agent, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age, evolved: d.evolved, caste: d.caste })),
       predator: toList(c.predator, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
@@ -91,7 +91,7 @@ function diffLists(prevList, nextList) {
 }
 
 function postSnapshot(now, force = false) {
-  if (!force && now - lastSnapshotAt < SNAPSHOT_MS) return;
+  if (!force && now - lastSnapshotAt < snapshotMs) return;
   lastSnapshotAt = now;
 
   const full = buildSnapshot();
@@ -137,6 +137,11 @@ function updateLodControls() {
   if (n > 9000) world.globals.updateStride = 3;
   else if (n > 3500) world.globals.updateStride = 2;
   else world.globals.updateStride = 1;
+
+  // Also reduce snapshot frequency under heavy load to cut worker->main traffic.
+  if (n > 9000 || avgStepMs > 10) snapshotMs = 120;      // ~8Hz
+  else if (n > 3500 || avgStepMs > 7) snapshotMs = 80;   // ~12.5Hz
+  else snapshotMs = 50;                                   // ~20Hz
 }
 
 function stepFrame(now) {

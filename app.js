@@ -8,6 +8,7 @@ const perfLabel = document.getElementById('perfLabel');
 
 let running = true;
 let latestWorld = null;
+let hasFreshFrame = false;
 
 const worker = new Worker(new URL('./sim.worker.js?v=20260223-4', import.meta.url), { type: 'module' });
 
@@ -114,13 +115,17 @@ worker.onmessage = (e) => {
   if (e.data?.type !== 'snapshot') return;
   applySnapshot(e.data);
   buildRenderWorld();
+  hasFreshFrame = true;
   tickLabel.textContent = `Tick: ${state.tick}`;
   seedValue.textContent = state.seed;
-  perfLabel.textContent = `FPS: ${state.perf.fps.toFixed(0)} | Step: ${state.perf.avgStepMs.toFixed(2)}ms | Q: ${Math.round((state.perf.effectQuality ?? 1) * 100)}% | S:${state.perf.updateStride ?? 1}`;
+  perfLabel.textContent = `FPS: ${state.perf.fps.toFixed(0)} | Step: ${state.perf.avgStepMs.toFixed(2)}ms | Q: ${Math.round((state.perf.effectQuality ?? 1) * 100)}% | S:${state.perf.updateStride ?? 1} | Snap:${state.perf.snapshotMs ?? 50}ms`;
 };
 
 function drawLoop() {
-  if (latestWorld) renderer.render(latestWorld);
+  if (latestWorld && hasFreshFrame) {
+    renderer.render(latestWorld);
+    hasFreshFrame = false;
+  }
   requestAnimationFrame(drawLoop);
 }
 
