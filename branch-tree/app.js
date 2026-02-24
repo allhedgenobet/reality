@@ -52,14 +52,14 @@ class Tip {
     this.width = width;
     this.energy = energy;
     this.genes = genes;
-    this.burning = 0;
+    this.grazed = 0;
     this.alive = true;
   }
 }
 
 let tips = [];
 let segments = 0;
-let fireZones = [];
+let grazers = [];
 
 function spawnTree(x, y, scale = 1, inheritedGenes = null) {
   const angle = Math.random() * Math.PI * 2;
@@ -75,18 +75,19 @@ function reset() {
   ctx.fillRect(0, 0, canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight);
 
   tips = [];
-  fireZones = [];
+  grazers = [];
   segments = 0;
 }
 
-function drawSegment(x1, y1, x2, y2, width, genes, glow = 1, burning = 0) {
+function drawSegment(x1, y1, x2, y2, width, genes, glow = 1, grazed = 0) {
   const h = genes?.hue ?? 120;
   const g = genes?.glow ?? 1;
-  const fireMix = clamp(burning, 0, 1);
-  const hue = h * (1 - fireMix) + 18 * fireMix;
-  const sat = 100;
-  const lightA = 72 * (1 - fireMix) + 64 * fireMix;
-  const lightB = 60 * (1 - fireMix) + 54 * fireMix;
+  const grazeMix = clamp(grazed, 0, 1);
+  const hue = h * (1 - grazeMix) + 52 * grazeMix;
+  const sat = 100 - grazeMix * 20;
+  const lightA = 72 * (1 - grazeMix) + 58 * grazeMix;
+  const lightB = 60 * (1 - grazeMix) + 47 * grazeMix;
+
   ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${lightA}%, ${0.1 * glow * g})`;
   ctx.lineWidth = width * 3;
   ctx.beginPath();
@@ -94,7 +95,7 @@ function drawSegment(x1, y1, x2, y2, width, genes, glow = 1, burning = 0) {
   ctx.lineTo(x2, y2);
   ctx.stroke();
 
-  ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${lightB}%, ${(0.82 + fireMix * 0.16) * glow * g})`;
+  ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${lightB}%, ${(0.82 + grazeMix * 0.12) * glow * g})`;
   ctx.lineWidth = width;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
@@ -102,10 +103,10 @@ function drawSegment(x1, y1, x2, y2, width, genes, glow = 1, burning = 0) {
   ctx.stroke();
 }
 
-function maybeIgniteFromDensity() {
+function maybeSpawnGrazersFromDensity() {
   if (tips.length < 70) return;
 
-  const cell = 80;
+  const cell = 90;
   const counts = new Map();
   for (const t of tips) {
     const cx = Math.floor(t.x / cell);
@@ -117,30 +118,27 @@ function maybeIgniteFromDensity() {
   for (const [key, count] of counts.entries()) {
     if (count < 18 || Math.random() > 0.06) continue;
     const [cx, cy] = key.split(',').map(Number);
-    fireZones.push({
+    grazers.push({
       x: (cx + 0.5) * cell,
       y: (cy + 0.5) * cell,
-      r: 8,
-      maxR: 95 + Math.random() * 40,
-      heat: 1,
+      r: 10,
+      maxR: 110 + Math.random() * 40,
       life: 1,
-      growRate: 0.7 + Math.random() * 0.7,
-      fadeRate: 0.004 + Math.random() * 0.004,
+      growRate: 0.65 + Math.random() * 0.8,
+      fadeRate: 0.003 + Math.random() * 0.004,
     });
     break;
   }
 }
 
-function updateFireZones() {
-  for (const z of fireZones) {
+function updateGrazers() {
+  for (const z of grazers) {
     z.r = Math.min(z.maxR, z.r + z.growRate);
     z.life -= z.fadeRate;
-    z.heat = z.life;
 
-    // Draw soft fire halo
     const grad = ctx.createRadialGradient(z.x, z.y, 0, z.x, z.y, z.r);
-    grad.addColorStop(0, `rgba(255,180,60,${0.22 * z.life})`);
-    grad.addColorStop(0.4, `rgba(255,90,20,${0.16 * z.life})`);
+    grad.addColorStop(0, `rgba(255,235,120,${0.16 * z.life})`);
+    grad.addColorStop(0.45, `rgba(220,170,60,${0.1 * z.life})`);
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -148,7 +146,7 @@ function updateFireZones() {
     ctx.fill();
   }
 
-  fireZones = fireZones.filter((z) => z.life > 0.02);
+  grazers = grazers.filter((z) => z.life > 0.02);
 }
 
 function step() {
@@ -156,8 +154,8 @@ function step() {
   const stopChance = Number(ui.stopChance.value);
   const wind = Number(ui.wind.value);
 
-  maybeIgniteFromDensity();
-  updateFireZones();
+  maybeSpawnGrazersFromDensity();
+  updateGrazers();
 
   const newTips = [];
 
@@ -166,26 +164,26 @@ function step() {
 
     const g = t.genes;
 
-    // Fire exposure from active burn zones
-    let fireExposure = 0;
-    for (const z of fireZones) {
+    let grazeExposure = 0;
+    for (const z of grazers) {
       const dx = t.x - z.x;
       const dy = t.y - z.y;
       const d2 = dx * dx + dy * dy;
       if (d2 > z.r * z.r) continue;
       const d = Math.sqrt(d2) || 1;
-      fireExposure += (1 - d / z.r) * z.heat;
+      grazeExposure += (1 - d / z.r) * z.life;
     }
-    t.burning = Math.max(0, t.burning * 0.9 + fireExposure * 0.75);
-    if (t.burning > 0.05) {
-      t.energy -= 0.9 * t.burning;
-      t.width *= 1 - 0.0045 * t.burning;
+
+    t.grazed = Math.max(0, t.grazed * 0.9 + grazeExposure * 0.75);
+    if (t.grazed > 0.05) {
+      t.energy -= 0.85 * t.grazed;
+      t.width *= 1 - 0.0038 * t.grazed;
     }
 
     const ageStop = (1 - Math.min(1, t.energy / (320 * g.vigor))) * 0.028;
     const thinStop = t.width < 0.9 ? 0.03 : 0;
-    const fireStop = t.burning * 0.05;
-    const effectiveStop = (stopChance + ageStop + thinStop + fireStop) * g.stopBias;
+    const grazeStop = t.grazed * 0.042;
+    const effectiveStop = (stopChance + ageStop + thinStop + grazeStop) * g.stopBias;
     if (Math.random() < effectiveStop || t.energy <= 0 || t.width <= 0.25) {
       t.alive = false;
       continue;
@@ -198,7 +196,7 @@ function step() {
     const nx = t.x + Math.cos(t.angle) * stepLen;
     const ny = t.y + Math.sin(t.angle) * stepLen;
 
-    drawSegment(t.x, t.y, nx, ny, t.width, g, 1, t.burning);
+    drawSegment(t.x, t.y, nx, ny, t.width, g, 1, t.grazed);
     segments++;
 
     if (Math.random() < 0.008 && t.width < 1.2) {
@@ -250,7 +248,7 @@ function step() {
   avgVigor /= n;
   avgBranch /= n;
 
-  ui.stats.textContent = `active tips: ${tips.length} | segments: ${segments} | fires:${fireZones.length} | vigor:${avgVigor.toFixed(2)} | branch:${avgBranch.toFixed(2)}`;
+  ui.stats.textContent = `active tips: ${tips.length} | segments: ${segments} | grazers:${grazers.length} | vigor:${avgVigor.toFixed(2)} | branch:${avgBranch.toFixed(2)}`;
 }
 
 function loop() {
