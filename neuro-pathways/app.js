@@ -83,12 +83,19 @@ function createModel() {
 
   neurons.push(goA, noGoA, gpiA, goB, noGoB, gpiB);
 
+  // Thalamus relay nodes (very simplified VA/VL-like gate)
+  const thalA = createNeuron(id++, TYPES.BG, 'A', 780, 245);
+  const thalB = createNeuron(id++, TYPES.BG, 'B', 780, 365);
+  thalA.vThresh = -53;
+  thalB.vThresh = -53;
+  neurons.push(thalA, thalB);
+
   // Output populations (L5-ish decision readout)
   const outA = [];
   const outB = [];
   for (let i = 0; i < 3; i++) {
-    outA.push(createNeuron(id++, TYPES.OUTPUT, 'A', 820, 150 + i * 70));
-    outB.push(createNeuron(id++, TYPES.OUTPUT, 'B', 820, 380 + i * 70));
+    outA.push(createNeuron(id++, TYPES.OUTPUT, 'A', 900, 150 + i * 70));
+    outB.push(createNeuron(id++, TYPES.OUTPUT, 'B', 900, 380 + i * 70));
   }
   neurons.push(...outA, ...outB);
 
@@ -139,9 +146,15 @@ function createModel() {
   addEdge(goB.id, gpiB.id, -1.2, 1, false);
   addEdge(noGoB.id, gpiB.id, 0.95, 1, false);
 
-  // GPi-like tonic inhibition on outputs
-  connectDense([gpiA], outA, -1.4, -1.0, 1, false);
-  connectDense([gpiB], outB, -1.4, -1.0, 1, false);
+  // GPi-like tonic inhibition on thalamus relay
+  addEdge(gpiA.id, thalA.id, -1.45, 1, false);
+  addEdge(gpiB.id, thalB.id, -1.45, 1, false);
+
+  // Cortex exc can drive thalamus, thalamus relays to output populations
+  connectDense(excA, [thalA], 0.35, 0.7, 1, true);
+  connectDense(excB, [thalB], 0.35, 0.7, 1, true);
+  connectDense([thalA], outA, 0.95, 1.3, 1, true);
+  connectDense([thalB], outB, 0.95, 1.3, 1, true);
 
   // Add simple delay buffer (fixed horizon)
   const maxDelay = 3;
@@ -155,7 +168,7 @@ function createModel() {
     neurons,
     edges,
     byId,
-    groups: { inA, inB, excA, excB, inh, goA, noGoA, gpiA, goB, noGoB, gpiB, outA, outB },
+    groups: { inA, inB, excA, excB, inh, goA, noGoA, gpiA, goB, noGoB, gpiB, thalA, thalB, outA, outB },
     delayBuffer,
     bufferIndex: 0,
     dopamine: 0,
@@ -164,6 +177,8 @@ function createModel() {
     rasterB: [],
     bgGateA: 0,
     bgGateB: 0,
+    thalA: 0,
+    thalB: 0,
   };
 }
 
@@ -266,8 +281,12 @@ function computeChoiceAndReward() {
   const rB = outputPopulationSpikeRate(M.groups.outB);
   const gateA = M.groups.gpiA.spike ? 1 : 0;
   const gateB = M.groups.gpiB.spike ? 1 : 0;
+  const thalA = M.groups.thalA.spike ? 1 : 0;
+  const thalB = M.groups.thalB.spike ? 1 : 0;
   M.bgGateA = gateA;
   M.bgGateB = gateB;
+  M.thalA = thalA;
+  M.thalB = thalB;
 
   let choice = '-';
   if (rA > 0 || rB > 0) choice = rA >= rB ? 'A' : 'B';
@@ -381,8 +400,9 @@ function drawLabels() {
   ctx.fillText('Excitatory pool B (L2/3-ish)', 265, 360);
   ctx.fillText('Interneurons (shared)', 540, 145);
   ctx.fillText('BG Go / NoGo / GPi-like gates', 620, 130);
-  ctx.fillText('Output A', 790, 120);
-  ctx.fillText('Output B', 790, 350);
+  ctx.fillText('Thalamus relay A/B', 748, 220);
+  ctx.fillText('Output A', 875, 120);
+  ctx.fillText('Output B', 875, 350);
 }
 
 function drawRaster() {
@@ -442,7 +462,8 @@ function render() {
   ctx.fillText(`Avg plastic w(A): ${avg(wAA).toFixed(3)}`, 20, 44);
   ctx.fillText(`Avg plastic w(B): ${avg(wBB).toFixed(3)}`, 20, 62);
   ctx.fillText(`BG gate GPi spikes A/B: ${M.bgGateA}/${M.bgGateB}`, 20, 80);
-  ctx.fillText(`Last choice: ${M.lastChoice}`, 20, 98);
+  ctx.fillText(`Thalamus relay spikes A/B: ${M.thalA}/${M.thalB}`, 20, 98);
+  ctx.fillText(`Last choice: ${M.lastChoice}`, 20, 116);
 }
 
 ui.stepBtn.addEventListener('click', () => {
