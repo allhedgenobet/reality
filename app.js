@@ -10,7 +10,7 @@ let running = true;
 let latestWorld = null;
 let hasFreshFrame = false;
 
-const worker = new Worker(new URL('./sim.worker.js?v=20260223-7', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./sim.worker.js?v=20260223-8', import.meta.url), { type: 'module' });
 
 const state = {
   tick: 0,
