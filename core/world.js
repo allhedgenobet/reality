@@ -23,7 +23,7 @@ export function createWorld(rng) {
       fertility: 0.6,
       metabolism: 1.0,
       storminess: 0.0,
-      reproductionThreshold: 1.6,
+      reproductionThreshold: 1.3,
       chaosLevel: 0.35,
       effectQuality: 1,
       updateStride: 1,
@@ -1521,7 +1521,7 @@ export function createWorld(rng) {
     }
 
     // Dynamic baseline threshold with chaos influence (higher chaos => slightly easier breeding)
-    world.globals.reproductionThreshold = 1.6 - world.globals.chaosLevel * 0.15;
+    world.globals.reproductionThreshold = 1.3 - world.globals.chaosLevel * 0.15;
   }
 
   // Apply force fields (attractors/repulsors painted by user).
