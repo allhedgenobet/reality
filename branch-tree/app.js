@@ -1,36 +1,28 @@
-// app.js
+// Optimized code for infinite growth
+// Logic to reduce branching rate
+const MAX_BRANCHES = 3; // Adjust this value to limit the number of active branches
 
-class InfiniteGrowth {
-    constructor() {
-        this.occupancyGrid = false;  // Disable occupancy grid
-        this.energyDepletion = 0.1; // Reduced energy depletion
-        this.stopConditions = []; // Remove stop conditions
-        this.vigor = 10; // Increased vigor
-        this.branchingRate = 0.5; // Increased branching rate
-        this.boundsCheck = false; // Disable bounds checking
-    }
+let currentBranchCount = 0;
 
-    run() {
-        // Infinite growth logic here
-        while (true) {
-            this.grow();
-            this.branch();
-            this.checkEnergy();
-        }
-    }
-
-    grow() {
-        // Growth logic
-    }
-
-    branch() {
-        // Branching logic
-    }
-
-    checkEnergy() {
-        // Check energy logic, modified for reduced depletion
+function addBranch() {
+    if (currentBranchCount < MAX_BRANCHES) {
+        // Add logic to create a new branch
+        currentBranchCount++;
+    } else {
+        console.warn('Maximum active tips reached, cannot add more branches.');
     }
 }
 
-const growth = new InfiniteGrowth();
-growth.run();
+// Function to manage performance throttling
+function throttleGrowth() {
+    const THROTTLE_DELAY = 100; // Delay in milliseconds to throttle growth
+    setTimeout(() => {
+        // Code to allow for growth after a certain period
+    }, THROTTLE_DELAY);
+}
+
+// Example of integrating both features
+function growTree() {
+    addBranch();
+    throttleGrowth();
+}
