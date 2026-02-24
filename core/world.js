@@ -3,8 +3,8 @@
 import { createEcs } from './ecs.js';
 
 export function createWorld(rng) {
-  const width = 1200;
-  const height = 720;
+  const width = 2400;
+  const height = 1440;
 
   const ecs = createEcs();
 
@@ -31,12 +31,12 @@ export function createWorld(rng) {
   };
 
   // Spawn some initial agents and resources
-  const AGENT_COUNT = 22;
-  const PREDATOR_COUNT = 7;
-  const APEX_COUNT = 3;
-  const CORAL_COUNT = 4;
-  const TITAN_COUNT = 1;
-  const RESOURCE_COUNT = 70;
+  const AGENT_COUNT = 88;
+  const PREDATOR_COUNT = 28;
+  const APEX_COUNT = 12;
+  const CORAL_COUNT = 16;
+  const TITAN_COUNT = 4;
+  const RESOURCE_COUNT = 280;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
