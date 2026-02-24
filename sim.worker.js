@@ -39,6 +39,17 @@ function toList(map, position, pick) {
   return out;
 }
 
+function toListWithVelocity(map, position, velocity, pick) {
+  const out = [];
+  for (const [id, data] of map.entries()) {
+    const pos = position.get(id);
+    if (!pos) continue;
+    const vel = velocity.get(id);
+    out.push({ id, x: pos.x, y: pos.y, vx: vel?.vx ?? 0, vy: vel?.vy ?? 0, ...(pick ? pick(data) : {}) });
+  }
+  return out;
+}
+
 function buildSnapshot() {
   const c = world.ecs.components;
   return {
@@ -50,11 +61,11 @@ function buildSnapshot() {
     camera: world.camera,
     perf: { fps, avgStepMs, effectQuality: world.globals.effectQuality ?? 1, updateStride: world.globals.updateStride ?? 1, snapshotMs },
     components: {
-      agent: toList(c.agent, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age, evolved: d.evolved, caste: d.caste })),
-      predator: toList(c.predator, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
-      apex: toList(c.apex, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
-      coral: toList(c.coral, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age, dna: d.dna ? { venom: d.dna.venom } : undefined })),
-      titan: toList(c.titan, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
+      agent: toListWithVelocity(c.agent, c.position, c.velocity, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age, evolved: d.evolved, caste: d.caste })),
+      predator: toListWithVelocity(c.predator, c.position, c.velocity, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
+      apex: toListWithVelocity(c.apex, c.position, c.velocity, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
+      coral: toListWithVelocity(c.coral, c.position, c.velocity, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age, dna: d.dna ? { venom: d.dna.venom } : undefined })),
+      titan: toListWithVelocity(c.titan, c.position, c.velocity, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
       burst: toList(c.burst, c.position, (d) => ({ life: d.life, hue: d.hue })),
       resource: toList(c.resource, c.position, (d) => ({ kind: d.kind, amount: d.amount, age: d.age, cycles: d.cycles, dna: d.dna })),
       forceField: toList(c.forceField, c.position, (d) => ({ strength: d.strength, radius: d.radius })),

@@ -10,7 +10,7 @@ let running = true;
 let latestWorld = null;
 let hasFreshFrame = false;
 
-const worker = new Worker(new URL('./sim.worker.js?v=20260223-4', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./sim.worker.js?v=20260223-5', import.meta.url), { type: 'module' });
 
 const state = {
   tick: 0,
@@ -75,7 +75,7 @@ function buildRenderWorld() {
   const addPos = (comp) => {
     for (const [id, e] of comp.entries()) {
       position.set(id, { x: e.x, y: e.y });
-      velocity.set(id, { vx: 0, vy: 0 });
+      velocity.set(id, { vx: e.vx ?? 0, vy: e.vy ?? 0 });
     }
   };
 
