@@ -9,6 +9,8 @@ const ui = {
   stats: document.getElementById('stats'),
 };
 
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
 function resize() {
   const dpr = window.devicePixelRatio || 1;
   const w = window.innerWidth;
@@ -18,13 +20,34 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
+function createBaseGenes() {
+  return {
+    branchBias: 1 + (Math.random() * 2 - 1) * 0.18,
+    stopBias: 1 + (Math.random() * 2 - 1) * 0.18,
+    jitter: 0.045 + (Math.random() * 2 - 1) * 0.015,
+    upwardBias: 0.014 + (Math.random() * 2 - 1) * 0.005,
+    vigor: 1 + (Math.random() * 2 - 1) * 0.2,
+  };
+}
+
+function mutateGenes(parent, m = 0.06) {
+  return {
+    branchBias: clamp(parent.branchBias + (Math.random() * 2 - 1) * m, 0.55, 1.7),
+    stopBias: clamp(parent.stopBias + (Math.random() * 2 - 1) * m, 0.5, 1.8),
+    jitter: clamp(parent.jitter + (Math.random() * 2 - 1) * m * 0.08, 0.01, 0.09),
+    upwardBias: clamp(parent.upwardBias + (Math.random() * 2 - 1) * m * 0.02, 0.004, 0.03),
+    vigor: clamp(parent.vigor + (Math.random() * 2 - 1) * m * 1.1, 0.6, 1.6),
+  };
+}
+
 class Tip {
-  constructor(x, y, angle, width, energy) {
+  constructor(x, y, angle, width, energy, genes) {
     this.x = x;
     this.y = y;
     this.angle = angle;
     this.width = width;
     this.energy = energy;
+    this.genes = genes;
     this.alive = true;
   }
 }
@@ -32,11 +55,12 @@ class Tip {
 let tips = [];
 let segments = 0;
 
-function spawnTree(x, y, scale = 1) {
+function spawnTree(x, y, scale = 1, inheritedGenes = null) {
   const angle = -Math.PI / 2 + (Math.random() * 2 - 1) * 0.07;
-  const width = (2.1 + Math.random() * 0.9) * scale;
-  const energy = (280 + Math.random() * 170) * scale;
-  tips.push(new Tip(x, y, angle, width, energy));
+  const genes = inheritedGenes ? mutateGenes(inheritedGenes, 0.08) : createBaseGenes();
+  const width = (2.1 + Math.random() * 0.9) * scale * genes.vigor;
+  const energy = (280 + Math.random() * 170) * scale * genes.vigor;
+  tips.push(new Tip(x, y, angle, width, energy, genes));
 }
 
 function reset() {
@@ -49,7 +73,6 @@ function reset() {
   tips = [];
 
   spawnTree(w * 0.5, h - 14, 1.0);
-
   segments = 0;
 }
 
@@ -79,27 +102,27 @@ function step() {
   for (const t of tips) {
     if (!t.alive) continue;
 
-    // Stochastic stopping behavior: older/thinner branches stop more often
-    const ageStop = (1 - Math.min(1, t.energy / 320)) * 0.028;
+    const g = t.genes;
+
+    const ageStop = (1 - Math.min(1, t.energy / (320 * g.vigor))) * 0.028;
     const thinStop = t.width < 0.9 ? 0.03 : 0;
-    if (Math.random() < stopChance + ageStop + thinStop || t.energy <= 0 || t.width <= 0.25) {
+    const effectiveStop = (stopChance + ageStop + thinStop) * g.stopBias;
+    if (Math.random() < effectiveStop || t.energy <= 0 || t.width <= 0.25) {
       t.alive = false;
       continue;
     }
 
-    const jitter = (Math.random() * 2 - 1) * 0.05;
-    // slight upward bias so trunks climb taller before wandering
-    const upwardBias = (-Math.PI / 2 - t.angle) * 0.015;
+    const jitter = (Math.random() * 2 - 1) * g.jitter;
+    const upwardBias = (-Math.PI / 2 - t.angle) * g.upwardBias;
     t.angle += jitter + wind + upwardBias;
 
-    const stepLen = 2.1 + Math.random() * 1.5;
+    const stepLen = (2.1 + Math.random() * 1.5) * (0.9 + 0.25 * g.vigor);
     const nx = t.x + Math.cos(t.angle) * stepLen;
     const ny = t.y + Math.sin(t.angle) * stepLen;
 
     drawSegment(t.x, t.y, nx, ny, t.width, 1);
     segments++;
 
-    // occasional little leaf sparks
     if (Math.random() < 0.008 && t.width < 1.2) {
       ctx.fillStyle = 'rgba(120,255,120,0.45)';
       ctx.beginPath();
@@ -112,23 +135,23 @@ function step() {
     t.energy -= 1;
     t.width *= 0.997;
 
-    // Branching event
-    const bChance = branchChance * (0.6 + Math.min(1, t.energy / 220));
+    const bChance = branchChance * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias;
     if (Math.random() < bChance && t.width > 0.45 && t.energy > 15) {
       const split = 0.2 + Math.random() * 0.55;
-      const childA = new Tip(t.x, t.y, t.angle - split, t.width * (0.72 + Math.random() * 0.12), t.energy * 0.63);
-      const childB = new Tip(t.x, t.y, t.angle + split, t.width * (0.72 + Math.random() * 0.12), t.energy * 0.63);
+      const childGenesA = mutateGenes(g, 0.02);
+      const childGenesB = mutateGenes(g, 0.02);
+      const childA = new Tip(t.x, t.y, t.angle - split, t.width * (0.72 + Math.random() * 0.12), t.energy * 0.63, childGenesA);
+      const childB = new Tip(t.x, t.y, t.angle + split, t.width * (0.72 + Math.random() * 0.12), t.energy * 0.63, childGenesB);
       t.energy *= 0.72;
       t.width *= 0.9;
       newTips.push(childA, childB);
     }
 
-    // Reproduction: mature branches can drop a nearby seed that starts a new tree.
     const canReproduce = t.energy > 45 && t.width > 0.55;
     if (canReproduce && Math.random() < 0.0015) {
       const sx = t.x + (Math.random() * 2 - 1) * 90;
       const sy = window.innerHeight - (6 + Math.random() * 16);
-      spawnTree(sx, sy, 0.62 + Math.random() * 0.35);
+      spawnTree(sx, sy, 0.62 + Math.random() * 0.35, g);
     }
 
     if (t.x < -50 || t.x > window.innerWidth + 50 || t.y < -50 || t.y > window.innerHeight + 50) {
@@ -139,19 +162,26 @@ function step() {
   tips.push(...newTips);
   tips = tips.filter((t) => t.alive);
 
-  ui.stats.textContent = `active tips: ${tips.length} | segments: ${segments}`;
+  let avgVigor = 0;
+  let avgBranch = 0;
+  for (const t of tips) {
+    avgVigor += t.genes.vigor;
+    avgBranch += t.genes.branchBias;
+  }
+  const n = Math.max(1, tips.length);
+  avgVigor /= n;
+  avgBranch /= n;
+
+  ui.stats.textContent = `active tips: ${tips.length} | segments: ${segments} | vigor:${avgVigor.toFixed(2)} | branch:${avgBranch.toFixed(2)}`;
 }
 
 function loop() {
-  // keep slight trails instead of full clear
   ctx.fillStyle = 'rgba(0,0,0,0.02)';
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
   if (tips.length > 0) {
-    // multiple simulation ticks per frame for faster growth
     for (let i = 0; i < 3; i++) step();
   } else {
-    // Keep it alive forever: reseed when everything has died out.
     spawnTree(window.innerWidth * 0.5, window.innerHeight - 14, 1.0);
   }
 

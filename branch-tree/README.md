@@ -7,6 +7,7 @@ A minimalist 2D generative branching tree on a black background.
 - Random branch termination (some branches stop growing)
 - Click to plant one tree exactly at the cursor
 - Slow self-reproduction via occasional seed drops
+- Heritable growth traits with small mutations each generation
 
 ## Run
 
