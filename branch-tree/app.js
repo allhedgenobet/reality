@@ -32,6 +32,13 @@ class Tip {
 let tips = [];
 let segments = 0;
 
+function spawnTree(x, y, scale = 1) {
+  const angle = -Math.PI / 2 + (Math.random() * 2 - 1) * 0.12;
+  const width = (2.1 + Math.random() * 0.9) * scale;
+  const energy = (170 + Math.random() * 110) * scale;
+  tips.push(new Tip(x, y, angle, width, energy));
+}
+
 function reset() {
   resize();
   ctx.fillStyle = '#000';
@@ -39,7 +46,16 @@ function reset() {
 
   const w = window.innerWidth;
   const h = window.innerHeight;
-  tips = [new Tip(w * 0.5, h - 14, -Math.PI / 2, 2.6, 220)];
+  tips = [];
+
+  const treeCount = Math.max(2, Math.floor(w / 320));
+  for (let i = 0; i < treeCount; i++) {
+    const x = ((i + 0.5) / treeCount) * w + (Math.random() * 2 - 1) * 40;
+    const y = h - (8 + Math.random() * 16);
+    const scale = 0.8 + Math.random() * 0.55;
+    spawnTree(x, y, scale);
+  }
+
   segments = 0;
 }
 
@@ -119,7 +135,7 @@ function step() {
   tips.push(...newTips);
   tips = tips.filter((t) => t.alive);
 
-  ui.stats.textContent = `tips: ${tips.length} | segments: ${segments}`;
+  ui.stats.textContent = `active tips: ${tips.length} | segments: ${segments}`;
 }
 
 function loop() {
