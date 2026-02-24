@@ -68,7 +68,13 @@ function loop(now) {
   }
 
   tickLabel.textContent = `Tick: ${world.tick}`;
-  perfLabel.textContent = `FPS: ${fps.toFixed(0)} | Step: ${avgStepMs.toFixed(2)}ms`;
+  // Adaptive quality: lower effects when sim step cost rises.
+  if (avgStepMs > 10 || fps < 30) world.globals.effectQuality = 0.35;
+  else if (avgStepMs > 7 || fps < 45) world.globals.effectQuality = 0.6;
+  else if (avgStepMs > 5 || fps < 55) world.globals.effectQuality = 0.8;
+  else world.globals.effectQuality = 1;
+
+  perfLabel.textContent = `FPS: ${fps.toFixed(0)} | Step: ${avgStepMs.toFixed(2)}ms | Q: ${Math.round(world.globals.effectQuality * 100)}%`;
   renderer.render(world);
   rafId = requestAnimationFrame(loop);
 }

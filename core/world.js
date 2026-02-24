@@ -25,6 +25,7 @@ export function createWorld(rng) {
       storminess: 0.0,
       reproductionThreshold: 1.6,
       chaosLevel: 0.35,
+      effectQuality: 1,
     },
   };
 
@@ -261,7 +262,8 @@ export function createWorld(rng) {
 
   function spawnApexBurst(x, y, baseHue, count, energy) {
     const { position, burst } = ecs.components;
-    const particles = count || 8;
+    const q = world.globals.effectQuality ?? 1;
+    const particles = Math.max(1, Math.round((count || 8) * q));
     const speedBase = 40 + energy * 12;
     for (let i = 0; i < particles; i++) {
       const id = ecs.createEntity();
@@ -841,7 +843,7 @@ export function createWorld(rng) {
         const d2 = dx * dx + dy * dy;
         if (d2 < predEatRadius * predEatRadius) {
           // Spawn small "absorption" particles from prey toward predator
-          const particles = 4;
+          const particles = Math.max(1, Math.round(4 * (world.globals.effectQuality ?? 1)));
           const hue = pred.colorHue ?? 30;
           const baseSpeed = 70;
           for (let i = 0; i < particles; i++) {
@@ -986,7 +988,7 @@ export function createWorld(rng) {
         const d2 = dx * dx + dy * dy;
         if (d2 < coralEatRadius * coralEatRadius) {
           // Spawn absorption particles
-          const particles = 3;
+          const particles = Math.max(1, Math.round(3 * (world.globals.effectQuality ?? 1)));
           const hue = cr.colorHue ?? 340;
           const baseSpeed = 60;
           for (let i = 0; i < particles; i++) {
