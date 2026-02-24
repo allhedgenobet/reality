@@ -106,7 +106,6 @@ export function createRenderer(canvas) {
       // Map age into a 0–1 growth phase for color/branch timing within a cycle
       const maxAge = 3 * 9; // reference scale ≈ 27s
       const phase = Math.max(0, Math.min(1, age / maxAge));
-      const stage = Math.floor(phase * 9); // 0–9 for discrete styling when needed
 
       // Growth factor: base smooth growth + slow, unbounded thickening over cycles
       const baseGrowth = 0.5 + phase * 0.7; // 0.5 → 1.2 within a cycle
@@ -492,7 +491,6 @@ export function createRenderer(canvas) {
       const age = ag.age ?? 0;
 
       const young = age < 6;           // newly spawned
-      const mature = age >= 6 && age < 20;
       const elder = age >= 20;
 
       let radius = 4 + energy * 2;
@@ -505,8 +503,8 @@ export function createRenderer(canvas) {
       let sat = 78;
       let lightness = evolved ? 72 : 65;
       let fillAlpha = evolved ? 1.0 : 0.95;
-      let strokeAlpha = evolved ? 1.0 : 0.9;
-      let strokeWidth = evolved ? 1.5 : 1;
+      const strokeAlpha = evolved ? 1.0 : 0.9;
+      const strokeWidth = evolved ? 1.5 : 1;
 
       if (young) {
         lightness += 4;
