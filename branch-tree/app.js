@@ -33,9 +33,9 @@ let tips = [];
 let segments = 0;
 
 function spawnTree(x, y, scale = 1) {
-  const angle = -Math.PI / 2 + (Math.random() * 2 - 1) * 0.12;
+  const angle = -Math.PI / 2 + (Math.random() * 2 - 1) * 0.07;
   const width = (2.1 + Math.random() * 0.9) * scale;
-  const energy = (170 + Math.random() * 110) * scale;
+  const energy = (280 + Math.random() * 170) * scale;
   tips.push(new Tip(x, y, angle, width, energy));
 }
 
@@ -80,15 +80,17 @@ function step() {
     if (!t.alive) continue;
 
     // Stochastic stopping behavior: older/thinner branches stop more often
-    const ageStop = (1 - Math.min(1, t.energy / 220)) * 0.04;
+    const ageStop = (1 - Math.min(1, t.energy / 320)) * 0.028;
     const thinStop = t.width < 0.9 ? 0.03 : 0;
     if (Math.random() < stopChance + ageStop + thinStop || t.energy <= 0 || t.width <= 0.25) {
       t.alive = false;
       continue;
     }
 
-    const jitter = (Math.random() * 2 - 1) * 0.08;
-    t.angle += jitter + wind;
+    const jitter = (Math.random() * 2 - 1) * 0.05;
+    // slight upward bias so trunks climb taller before wandering
+    const upwardBias = (-Math.PI / 2 - t.angle) * 0.015;
+    t.angle += jitter + wind + upwardBias;
 
     const stepLen = 2.1 + Math.random() * 1.5;
     const nx = t.x + Math.cos(t.angle) * stepLen;
