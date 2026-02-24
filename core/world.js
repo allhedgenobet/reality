@@ -544,7 +544,6 @@ export function createWorld(rng) {
     const apexGrid = buildSpatialIndex(apexList, 0);
 
     // Phase 5 typed lanes for mover species (reduces iterator/object churn in hot steering loops)
-    const predatorIds = new Uint32Array(predator.size);
     const predatorPos = new Array(predator.size);
     const predatorVel = new Array(predator.size);
     const predatorDna = new Array(predator.size);
@@ -554,12 +553,59 @@ export function createWorld(rng) {
       const pos = position.get(id);
       const vel = velocity.get(id);
       if (!pos || !vel) continue;
-      predatorIds[predatorN] = id;
       predatorPos[predatorN] = pos;
       predatorVel[predatorN] = vel;
       predatorDna[predatorN] = pred.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       predatorRest[predatorN] = pred.rest || 0;
       predatorN++;
+    }
+
+    const apexPos = new Array(apex.size);
+    const apexVel = new Array(apex.size);
+    const apexDna = new Array(apex.size);
+    const apexRest = new Float32Array(apex.size);
+    let apexN = 0;
+    for (const [id, ap] of apex.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      apexPos[apexN] = pos;
+      apexVel[apexN] = vel;
+      apexDna[apexN] = ap.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      apexRest[apexN] = ap.rest || 0;
+      apexN++;
+    }
+
+    const coralPos = new Array(coral.size);
+    const coralVel = new Array(coral.size);
+    const coralDna = new Array(coral.size);
+    const coralRest = new Float32Array(coral.size);
+    let coralN = 0;
+    for (const [id, cr] of coral.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      coralPos[coralN] = pos;
+      coralVel[coralN] = vel;
+      coralDna[coralN] = cr.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0, venom: 0 };
+      coralRest[coralN] = cr.rest || 0;
+      coralN++;
+    }
+
+    const titanPos = new Array(titan.size);
+    const titanVel = new Array(titan.size);
+    const titanDna = new Array(titan.size);
+    const titanRest = new Float32Array(titan.size);
+    let titanN = 0;
+    for (const [id, tt] of titan.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      titanPos[titanN] = pos;
+      titanVel[titanN] = vel;
+      titanDna[titanN] = tt.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      titanRest[titanN] = tt.rest || 0;
+      titanN++;
     }
 
     for (const [id, ag] of agent.entries()) {
@@ -659,17 +705,14 @@ export function createWorld(rng) {
       }
     }
 
-    // Apex hunters seek predators and coral (top of chain)
+    // Apex hunters seek predators and coral (typed-lane iteration)
     const apexSeekRadius = 260;
-    for (const [id, ap] of apex.entries()) {
-      const pos = position.get(id);
-      const vel = velocity.get(id);
-      if (!pos || !vel) continue;
+    for (let ai = 0; ai < apexN; ai++) {
+      if (apexRest[ai] > 0) continue;
 
-      // Resting apex drift but do not aggressively seek
-      if (ap.rest && ap.rest > 0) continue;
-
-      const dna = ap.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      const pos = apexPos[ai];
+      const vel = apexVel[ai];
+      const dna = apexDna[ai];
       const seekRadius = apexSeekRadius * dna.sense;
 
       let target = null;
@@ -701,7 +744,7 @@ export function createWorld(rng) {
         const dx = target.x - pos.x;
         const dy = target.y - pos.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const desiredSpeed = 55 * dna.speed; // more assertive hunters
+        const desiredSpeed = 55 * dna.speed;
         const desiredVx = (dx / dist) * desiredSpeed;
         const desiredVy = (dy / dist) * desiredSpeed;
         const blend = 0.8;
@@ -710,16 +753,14 @@ export function createWorld(rng) {
       }
     }
 
-    // Coral hunters seek agents
+    // Coral hunters seek agents (typed-lane iteration)
     const coralSeekRadius = 180;
-    for (const [id, cr] of coral.entries()) {
-      const pos = position.get(id);
-      const vel = velocity.get(id);
-      if (!pos || !vel) continue;
+    for (let ci = 0; ci < coralN; ci++) {
+      if (coralRest[ci] > 0) continue;
 
-      if (cr.rest && cr.rest > 0) continue;
-
-      const dna = cr.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0, venom: 0 };
+      const pos = coralPos[ci];
+      const vel = coralVel[ci];
+      const dna = coralDna[ci];
       const seekRadius = coralSeekRadius * dna.sense;
 
       let target = null;
@@ -749,16 +790,14 @@ export function createWorld(rng) {
       }
     }
 
-    // Titans hunt apex hexagons
+    // Titans hunt apex hexagons (typed-lane iteration)
     const titanSeekRadius = 300;
-    for (const [id, tt] of titan.entries()) {
-      const pos = position.get(id);
-      const vel = velocity.get(id);
-      if (!pos || !vel) continue;
+    for (let ti = 0; ti < titanN; ti++) {
+      if (titanRest[ti] > 0) continue;
 
-      if (tt.rest && tt.rest > 0) continue;
-
-      const dna = tt.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      const pos = titanPos[ti];
+      const vel = titanVel[ti];
+      const dna = titanDna[ti];
       const seekRadius = titanSeekRadius * dna.sense;
 
       let target = null;
