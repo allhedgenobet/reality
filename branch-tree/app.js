@@ -48,13 +48,7 @@ function reset() {
   const h = window.innerHeight;
   tips = [];
 
-  const treeCount = Math.max(2, Math.floor(w / 320));
-  for (let i = 0; i < treeCount; i++) {
-    const x = ((i + 0.5) / treeCount) * w + (Math.random() * 2 - 1) * 40;
-    const y = h - (8 + Math.random() * 16);
-    const scale = 0.8 + Math.random() * 0.55;
-    spawnTree(x, y, scale);
-  }
+  spawnTree(w * 0.5, h - 14, 1.0);
 
   segments = 0;
 }
@@ -151,9 +145,12 @@ function loop() {
   ctx.fillStyle = 'rgba(0,0,0,0.02)';
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
-  if (tips.length > 0 && segments < 180000) {
+  if (tips.length > 0) {
     // multiple simulation ticks per frame for faster growth
     for (let i = 0; i < 3; i++) step();
+  } else {
+    // Keep it alive forever: reseed when everything has died out.
+    spawnTree(window.innerWidth * 0.5, window.innerHeight - 14, 1.0);
   }
 
   requestAnimationFrame(loop);
