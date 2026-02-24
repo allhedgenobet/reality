@@ -15,6 +15,8 @@ let avgStepMs = 0;
 let fps = 0;
 let frameCounter = 0;
 let fpsWindowStart = performance.now();
+const SNAPSHOT_MS = 50; // ~20Hz snapshot stream to reduce postMessage overhead
+let lastSnapshotAt = 0;
 
 function isExtinct(currentWorld) {
   const { agent, predator, apex, coral, titan } = currentWorld.ecs.components;
@@ -61,6 +63,12 @@ function buildSnapshot() {
   };
 }
 
+function postSnapshot(now, force = false) {
+  if (!force && now - lastSnapshotAt < SNAPSHOT_MS) return;
+  lastSnapshotAt = now;
+  postMessage({ type: 'snapshot', snapshot: buildSnapshot() });
+}
+
 function stepFrame(now) {
   const elapsed = now - lastTime;
   lastTime = now;
@@ -77,6 +85,7 @@ function stepFrame(now) {
       if (isExtinct(world)) {
         resetWorld();
         accum = 0;
+        postSnapshot(now, true);
         break;
       }
     }
@@ -89,7 +98,7 @@ function stepFrame(now) {
     fpsWindowStart = now;
   }
 
-  postMessage({ type: 'snapshot', snapshot: buildSnapshot() });
+  postSnapshot(now);
 }
 
 onmessage = (e) => {
@@ -102,4 +111,5 @@ onmessage = (e) => {
   }
 };
 
+postSnapshot(performance.now(), true);
 setInterval(() => stepFrame(performance.now()), 16);
