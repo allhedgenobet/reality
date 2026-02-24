@@ -83,7 +83,7 @@ function spawnTree(x, y, scale = 1, inheritedGenes = null) {
   const width = (2.1 + Math.random() * 0.9) * scale * genes.vigor;
   const energy = (420 + Math.random() * 260) * scale * genes.vigor;
   tips.push(new Tip(x, y, angle, width, energy, genes));
-  if (occupancy) occupancy[occIndex(x, y)] = 1;
+  if (occupancy) occupancy[occIndex(x, y)]++;
 }
 
 function reset() {
@@ -396,15 +396,15 @@ function step() {
     const nx = t.x + Math.cos(t.angle) * stepLen;
     const ny = t.y + Math.sin(t.angle) * stepLen;
 
-    // One-branch-per-pixel rule: if target pixel already occupied, stop this tip.
+    // Three-branches-per-pixel rule: if target pixel already has 3 or more branches, stop this tip.
     const idx = occIndex(nx, ny);
-    if (occupancy[idx] === 1) {
+    if (occupancy[idx] >= 3) {
       t.alive = false;
       continue;
     }
 
     drawSegment(t.x, t.y, nx, ny, t.width, g, 1, t.grazed);
-    occupancy[idx] = 1;
+    occupancy[idx]++;
     segments++;
 
     if (Math.random() < 0.008 && t.width < 1.2) {
