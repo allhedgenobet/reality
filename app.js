@@ -10,6 +10,7 @@ const canvas = document.getElementById('world');
 const renderer = createRenderer(canvas);
 const tickLabel = document.getElementById('tickLabel');
 const seedValue = document.getElementById('seedValue');
+const perfLabel = document.getElementById('perfLabel');
 
 seedValue.textContent = seedStr;
 
@@ -19,6 +20,10 @@ let running = false;
 let lastTime = 0;
 let accum = 0;
 let rafId = null;
+let fps = 0;
+let frameCounter = 0;
+let fpsWindowStart = performance.now();
+let avgStepMs = 0;
 
 function isExtinct(currentWorld) {
   const { agent, predator, apex, coral, titan } = currentWorld.ecs.components;
@@ -42,7 +47,10 @@ function loop(now) {
   accum += Math.min(elapsed, 200);
 
   while (accum >= MS_PER_TICK) {
+    const t0 = performance.now();
     world.step(DT);
+    const stepMs = performance.now() - t0;
+    avgStepMs = avgStepMs * 0.9 + stepMs * 0.1;
     accum -= MS_PER_TICK;
 
     if (isExtinct(world)) {
@@ -52,7 +60,15 @@ function loop(now) {
     }
   }
 
+  frameCounter += 1;
+  if (now - fpsWindowStart >= 500) {
+    fps = (frameCounter * 1000) / (now - fpsWindowStart);
+    frameCounter = 0;
+    fpsWindowStart = now;
+  }
+
   tickLabel.textContent = `Tick: ${world.tick}`;
+  perfLabel.textContent = `FPS: ${fps.toFixed(0)} | Step: ${avgStepMs.toFixed(2)}ms`;
   renderer.render(world);
   rafId = requestAnimationFrame(loop);
 }
