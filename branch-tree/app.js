@@ -22,21 +22,25 @@ function resize() {
 
 function createBaseGenes() {
   return {
-    branchBias: 1 + (Math.random() * 2 - 1) * 0.18,
-    stopBias: 1 + (Math.random() * 2 - 1) * 0.18,
-    jitter: 0.045 + (Math.random() * 2 - 1) * 0.015,
-    turnBias: (Math.random() * 2 - 1) * 0.01,
-    vigor: 1 + (Math.random() * 2 - 1) * 0.2,
+    branchBias: 1 + (Math.random() * 2 - 1) * 0.22,
+    stopBias: 1 + (Math.random() * 2 - 1) * 0.22,
+    jitter: 0.045 + (Math.random() * 2 - 1) * 0.02,
+    turnBias: (Math.random() * 2 - 1) * 0.012,
+    vigor: 1 + (Math.random() * 2 - 1) * 0.24,
+    hue: 120 + (Math.random() * 2 - 1) * 18,
+    glow: 1 + (Math.random() * 2 - 1) * 0.2,
   };
 }
 
-function mutateGenes(parent, m = 0.06) {
+function mutateGenes(parent, m = 0.1) {
   return {
-    branchBias: clamp(parent.branchBias + (Math.random() * 2 - 1) * m, 0.55, 1.7),
-    stopBias: clamp(parent.stopBias + (Math.random() * 2 - 1) * m, 0.5, 1.8),
-    jitter: clamp(parent.jitter + (Math.random() * 2 - 1) * m * 0.08, 0.01, 0.09),
-    turnBias: clamp(parent.turnBias + (Math.random() * 2 - 1) * m * 0.02, -0.04, 0.04),
-    vigor: clamp(parent.vigor + (Math.random() * 2 - 1) * m * 1.1, 0.6, 1.6),
+    branchBias: clamp(parent.branchBias + (Math.random() * 2 - 1) * m, 0.45, 1.95),
+    stopBias: clamp(parent.stopBias + (Math.random() * 2 - 1) * m, 0.4, 2.0),
+    jitter: clamp(parent.jitter + (Math.random() * 2 - 1) * m * 0.09, 0.008, 0.11),
+    turnBias: clamp(parent.turnBias + (Math.random() * 2 - 1) * m * 0.03, -0.055, 0.055),
+    vigor: clamp(parent.vigor + (Math.random() * 2 - 1) * m * 1.25, 0.5, 1.9),
+    hue: clamp(parent.hue + (Math.random() * 2 - 1) * m * 24, 85, 150),
+    glow: clamp(parent.glow + (Math.random() * 2 - 1) * m * 0.7, 0.65, 1.45),
   };
 }
 
@@ -57,7 +61,7 @@ let segments = 0;
 
 function spawnTree(x, y, scale = 1, inheritedGenes = null) {
   const angle = Math.random() * Math.PI * 2;
-  const genes = inheritedGenes ? mutateGenes(inheritedGenes, 0.08) : createBaseGenes();
+  const genes = inheritedGenes ? mutateGenes(inheritedGenes, 0.13) : createBaseGenes();
   const width = (2.1 + Math.random() * 0.9) * scale * genes.vigor;
   const energy = (280 + Math.random() * 170) * scale * genes.vigor;
   tips.push(new Tip(x, y, angle, width, energy, genes));
@@ -72,15 +76,17 @@ function reset() {
   segments = 0;
 }
 
-function drawSegment(x1, y1, x2, y2, width, glow = 1) {
-  ctx.strokeStyle = `rgba(120, 255, 120, ${0.08 * glow})`;
+function drawSegment(x1, y1, x2, y2, width, genes, glow = 1) {
+  const h = genes?.hue ?? 120;
+  const g = genes?.glow ?? 1;
+  ctx.strokeStyle = `hsla(${h}, 100%, 72%, ${0.08 * glow * g})`;
   ctx.lineWidth = width * 3;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
   ctx.stroke();
 
-  ctx.strokeStyle = `rgba(90, 255, 90, ${0.7 * glow})`;
+  ctx.strokeStyle = `hsla(${h}, 100%, 60%, ${0.7 * glow * g})`;
   ctx.lineWidth = width;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
@@ -115,7 +121,7 @@ function step() {
     const nx = t.x + Math.cos(t.angle) * stepLen;
     const ny = t.y + Math.sin(t.angle) * stepLen;
 
-    drawSegment(t.x, t.y, nx, ny, t.width, 1);
+    drawSegment(t.x, t.y, nx, ny, t.width, g, 1);
     segments++;
 
     if (Math.random() < 0.008 && t.width < 1.2) {
@@ -133,8 +139,8 @@ function step() {
     const bChance = branchChance * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias;
     if (Math.random() < bChance && t.width > 0.45 && t.energy > 15) {
       const split = 0.2 + Math.random() * 0.55;
-      const childGenesA = mutateGenes(g, 0.02);
-      const childGenesB = mutateGenes(g, 0.02);
+      const childGenesA = mutateGenes(g, 0.08);
+      const childGenesB = mutateGenes(g, 0.08);
       const childA = new Tip(t.x, t.y, t.angle - split, t.width * (0.72 + Math.random() * 0.12), t.energy * 0.63, childGenesA);
       const childB = new Tip(t.x, t.y, t.angle + split, t.width * (0.72 + Math.random() * 0.12), t.energy * 0.63, childGenesB);
       t.energy *= 0.72;
