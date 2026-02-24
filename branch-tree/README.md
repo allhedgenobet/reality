@@ -11,6 +11,7 @@ A minimalist 2D generative branching tree on a black background.
 - Grazer mechanic: dense clusters attract wandering grazers (small circular units) that eat branches
 - Grazers can reproduce in dense feeding zones
 - Added a higher trophic predator level that hunts grazers
+- Tree competition/crowding pressure reduces branching + reproduction in dense patches
 
 ## Run
 

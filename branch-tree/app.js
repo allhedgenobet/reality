@@ -310,6 +310,16 @@ function step() {
   updateGrazers();
   updatePredators();
 
+  // Competition pressure: local crowding raises stress and limits runaway growth.
+  const cell = 70;
+  const density = new Map();
+  for (const t of tips) {
+    const cx = Math.floor(t.x / cell);
+    const cy = Math.floor(t.y / cell);
+    const key = `${cx},${cy}`;
+    density.set(key, (density.get(key) || 0) + 1);
+  }
+
   const newTips = [];
 
   for (const t of tips) {
@@ -327,16 +337,27 @@ function step() {
       grazeExposure += (1 - d / z.r) * z.life;
     }
 
+    const cx = Math.floor(t.x / cell);
+    const cy = Math.floor(t.y / cell);
+    const localN = density.get(`${cx},${cy}`) || 0;
+    const competition = Math.max(0, (localN - 7) * 0.03);
+
     t.grazed = Math.max(0, t.grazed * 0.9 + grazeExposure * 0.75);
     if (t.grazed > 0.05) {
       t.energy -= 0.85 * t.grazed;
       t.width *= 1 - 0.0038 * t.grazed;
     }
 
+    if (competition > 0) {
+      t.energy -= 0.55 * competition;
+      t.width *= 1 - 0.0022 * competition;
+    }
+
     const ageStop = (1 - Math.min(1, t.energy / (320 * g.vigor))) * 0.028;
     const thinStop = t.width < 0.9 ? 0.03 : 0;
     const grazeStop = t.grazed * 0.042;
-    const effectiveStop = (stopChance + ageStop + thinStop + grazeStop) * g.stopBias;
+    const compStop = competition * 0.08;
+    const effectiveStop = (stopChance + ageStop + thinStop + grazeStop + compStop) * g.stopBias;
     if (Math.random() < effectiveStop || t.energy <= 0 || t.width <= 0.25) {
       t.alive = false;
       continue;
@@ -364,7 +385,8 @@ function step() {
     t.energy -= 0.72;
     t.width *= 0.9983;
 
-    const bChance = branchChance * 0.72 * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias;
+    const crowdingFactor = 1 / (1 + competition * 3.5);
+    const bChance = branchChance * 0.72 * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias * crowdingFactor;
     if (Math.random() < bChance && t.width > 0.45 && t.energy > 15) {
       const split = 0.2 + Math.random() * 0.55;
       const childGenesA = mutateGenes(g, 0.08);
@@ -377,7 +399,7 @@ function step() {
     }
 
     const canReproduce = t.energy > 45 && t.width > 0.55;
-    if (canReproduce && Math.random() < 0.0024) {
+    if (canReproduce && Math.random() < 0.0024 * crowdingFactor) {
       const sx = t.x + (Math.random() * 2 - 1) * 14;
       const sy = t.y + (Math.random() * 2 - 1) * 14;
       spawnTree(sx, sy, 0.62 + Math.random() * 0.35, g);
