@@ -10,7 +10,7 @@ let running = true;
 let latestWorld = null;
 let hasFreshFrame = false;
 
-const worker = new Worker(new URL('./sim.worker.js?v=20260223-8', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./sim.worker.js?v=20260223-9', import.meta.url), { type: 'module' });
 
 const state = {
   tick: 0,
@@ -134,10 +134,46 @@ function toggleRun() {
   worker.postMessage({ type: running ? 'resume' : 'pause' });
 }
 
+function sendCamera() {
+  if (!latestWorld) return;
+  worker.postMessage({
+    type: 'setCamera',
+    x: latestWorld.camera.x,
+    y: latestWorld.camera.y,
+  });
+}
+
 window.addEventListener('keydown', (e) => {
-  if (e.code !== 'Space') return;
-  e.preventDefault();
-  toggleRun();
+  if (e.code === 'Space') {
+    e.preventDefault();
+    toggleRun();
+    return;
+  }
+
+  if (!latestWorld) return;
+
+  const panStep = 80 / Math.max(0.2, latestWorld.camera.zoom);
+  let moved = false;
+
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+    latestWorld.camera.x -= panStep;
+    moved = true;
+  } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+    latestWorld.camera.x += panStep;
+    moved = true;
+  } else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+    latestWorld.camera.y -= panStep;
+    moved = true;
+  } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+    latestWorld.camera.y += panStep;
+    moved = true;
+  }
+
+  if (moved) {
+    e.preventDefault();
+    sendCamera();
+    hasFreshFrame = true;
+  }
 });
 
 canvas.addEventListener('wheel', (e) => {
@@ -155,5 +191,32 @@ canvas.addEventListener('wheel', (e) => {
   latestWorld.camera.zoom = nextZoom;
   worker.postMessage({ type: 'setZoom', zoom: nextZoom });
 }, { passive: false });
+
+let dragging = false;
+let lastDragX = 0;
+let lastDragY = 0;
+
+canvas.addEventListener('mousedown', (e) => {
+  dragging = true;
+  lastDragX = e.clientX;
+  lastDragY = e.clientY;
+});
+
+window.addEventListener('mouseup', () => {
+  dragging = false;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!dragging || !latestWorld) return;
+  const dx = e.clientX - lastDragX;
+  const dy = e.clientY - lastDragY;
+  lastDragX = e.clientX;
+  lastDragY = e.clientY;
+
+  latestWorld.camera.x -= dx / Math.max(0.2, latestWorld.camera.zoom);
+  latestWorld.camera.y -= dy / Math.max(0.2, latestWorld.camera.zoom);
+  hasFreshFrame = true;
+  sendCamera();
+});
 
 requestAnimationFrame(drawLoop);

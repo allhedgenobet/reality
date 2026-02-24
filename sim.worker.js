@@ -188,14 +188,26 @@ function stepFrame(now) {
   postSnapshot(now);
 }
 
+function wrapCamera(cam) {
+  const w = world.width;
+  const h = world.height;
+  cam.x = ((cam.x % w) + w) % w;
+  cam.y = ((cam.y % h) + h) % h;
+}
+
 onmessage = (e) => {
-  const { type, zoom } = e.data || {};
+  const { type, zoom, x, y } = e.data || {};
   if (type === 'toggle') running = !running;
   if (type === 'pause') running = false;
   if (type === 'resume') running = true;
   if (type === 'setZoom' && Number.isFinite(zoom)) {
     // Keep minimum zoom at fit-like floor from UI side to avoid empty margins.
     world.camera.zoom = Math.max(0.3, Math.min(8, zoom));
+  }
+  if (type === 'setCamera') {
+    if (Number.isFinite(x)) world.camera.x = x;
+    if (Number.isFinite(y)) world.camera.y = y;
+    wrapCamera(world.camera);
   }
 };
 
