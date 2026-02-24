@@ -1,4 +1,4 @@
-import { createRenderer } from './core/render.js?v=20260223-2';
+import { createRenderer } from './core/render.js?v=20260224-1';
 
 const canvas = document.getElementById('world');
 const renderer = createRenderer(canvas);
@@ -12,7 +12,9 @@ let hasFreshFrame = false;
 let cameraSendTimer = null;
 let lastRenderAt = 0;
 
-const worker = new Worker(new URL('./sim.worker.js?v=20260223-11', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./sim.worker.js?v=20260224-1', import.meta.url), { type: 'module' });
+
+const COMPONENT_NAMES = ['agent', 'predator', 'apex', 'coral', 'titan', 'burst', 'resource', 'forceField'];
 
 const state = {
   tick: 0,
@@ -22,17 +24,59 @@ const state = {
   regime: 'calm',
   camera: { zoom: 1, x: 600, y: 360 },
   perf: { fps: 0, avgStepMs: 0, effectQuality: 1 },
-  components: {
-    agent: new Map(),
-    predator: new Map(),
-    apex: new Map(),
-    coral: new Map(),
-    titan: new Map(),
-    burst: new Map(),
-    resource: new Map(),
-    forceField: new Map(),
-  },
+  components: Object.fromEntries(COMPONENT_NAMES.map((n) => [n, new Map()])),
 };
+
+function ensureRenderWorld() {
+  if (latestWorld) return;
+  latestWorld = {
+    tick: state.tick,
+    width: state.width,
+    height: state.height,
+    regime: state.regime,
+    camera: { ...state.camera },
+    ecs: {
+      components: {
+        position: new Map(),
+        velocity: new Map(),
+        agent: new Map(),
+        predator: new Map(),
+        apex: new Map(),
+        coral: new Map(),
+        titan: new Map(),
+        burst: new Map(),
+        resource: new Map(),
+        forceField: new Map(),
+      },
+    },
+  };
+}
+
+function toRenderData(name, e) {
+  if (name === 'agent') return { colorHue: e.colorHue, energy: e.energy, age: e.age, evolved: e.evolved, caste: e.caste };
+  if (name === 'predator') return { colorHue: e.colorHue, energy: e.energy, age: e.age };
+  if (name === 'apex') return { colorHue: e.colorHue, energy: e.energy, age: e.age };
+  if (name === 'coral') return { colorHue: e.colorHue, energy: e.energy, age: e.age, dna: e.dna };
+  if (name === 'titan') return { colorHue: e.colorHue, energy: e.energy, age: e.age };
+  if (name === 'burst') return { life: e.life, hue: e.hue };
+  if (name === 'resource') return { kind: e.kind, amount: e.amount, age: e.age, cycles: e.cycles, dna: e.dna };
+  if (name === 'forceField') return { strength: e.strength, radius: e.radius };
+  return {};
+}
+
+function upsertRenderEntity(name, e) {
+  const comp = latestWorld.ecs.components;
+  comp.position.set(e.id, { x: e.x, y: e.y });
+  comp.velocity.set(e.id, { vx: e.vx ?? 0, vy: e.vy ?? 0 });
+  comp[name].set(e.id, toRenderData(name, e));
+}
+
+function removeRenderEntity(name, id) {
+  const comp = latestWorld.ecs.components;
+  comp[name].delete(id);
+  comp.position.delete(id);
+  comp.velocity.delete(id);
+}
 
 function setFull(listMap, list) {
   listMap.clear();
@@ -45,6 +89,8 @@ function applyDelta(listMap, patch) {
 }
 
 function applySnapshot(msg) {
+  ensureRenderWorld();
+
   const s = msg.snapshot;
   state.tick = s.tick;
   state.seed = s.seed;
@@ -54,69 +100,36 @@ function applySnapshot(msg) {
   state.camera = { ...s.camera };
   state.perf = { ...s.perf };
 
+  latestWorld.tick = state.tick;
+  latestWorld.width = state.width;
+  latestWorld.height = state.height;
+  latestWorld.regime = state.regime;
+  latestWorld.camera = { ...state.camera };
+
   const mode = msg.mode || 'full';
-  const names = ['agent', 'predator', 'apex', 'coral', 'titan', 'burst', 'resource', 'forceField'];
-
   if (mode === 'full') {
-    for (const n of names) setFull(state.components[n], s.components[n]);
-  } else {
-    for (const n of names) applyDelta(state.components[n], s.components[n]);
-  }
-}
-
-function mapFromEntries(src, pick) {
-  const m = new Map();
-  for (const [id, e] of src.entries()) m.set(id, pick(e));
-  return m;
-}
-
-function buildRenderWorld() {
-  const position = new Map();
-  const velocity = new Map();
-
-  const addPos = (comp) => {
-    for (const [id, e] of comp.entries()) {
-      position.set(id, { x: e.x, y: e.y });
-      velocity.set(id, { vx: e.vx ?? 0, vy: e.vy ?? 0 });
+    for (const n of COMPONENT_NAMES) {
+      setFull(state.components[n], s.components[n]);
+      latestWorld.ecs.components[n].clear();
     }
-  };
+    latestWorld.ecs.components.position.clear();
+    latestWorld.ecs.components.velocity.clear();
 
-  addPos(state.components.agent);
-  addPos(state.components.predator);
-  addPos(state.components.apex);
-  addPos(state.components.coral);
-  addPos(state.components.titan);
-  addPos(state.components.burst);
-  addPos(state.components.resource);
-  addPos(state.components.forceField);
-
-  latestWorld = {
-    tick: state.tick,
-    width: state.width,
-    height: state.height,
-    regime: state.regime,
-    camera: { ...state.camera },
-    ecs: {
-      components: {
-        position,
-        velocity,
-        agent: mapFromEntries(state.components.agent, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age, evolved: e.evolved, caste: e.caste })),
-        predator: mapFromEntries(state.components.predator, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age })),
-        apex: mapFromEntries(state.components.apex, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age })),
-        coral: mapFromEntries(state.components.coral, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age, dna: e.dna })),
-        titan: mapFromEntries(state.components.titan, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age })),
-        burst: mapFromEntries(state.components.burst, (e) => ({ life: e.life, hue: e.hue })),
-        resource: mapFromEntries(state.components.resource, (e) => ({ kind: e.kind, amount: e.amount, age: e.age, cycles: e.cycles, dna: e.dna })),
-        forceField: mapFromEntries(state.components.forceField, (e) => ({ strength: e.strength, radius: e.radius })),
-      },
-    },
-  };
+    for (const n of COMPONENT_NAMES) {
+      for (const e of state.components[n].values()) upsertRenderEntity(n, e);
+    }
+  } else {
+    for (const n of COMPONENT_NAMES) {
+      applyDelta(state.components[n], s.components[n]);
+      for (const e of s.components[n]?.upserts || []) upsertRenderEntity(n, e);
+      for (const id of s.components[n]?.removes || []) removeRenderEntity(n, id);
+    }
+  }
 }
 
 worker.onmessage = (e) => {
   if (e.data?.type !== 'snapshot') return;
   applySnapshot(e.data);
-  buildRenderWorld();
   hasFreshFrame = true;
   tickLabel.textContent = `Tick: ${state.tick}`;
   seedValue.textContent = state.seed;
@@ -150,8 +163,7 @@ function toggleRun() {
 }
 
 function sendCamera() {
-  if (!latestWorld) return;
-  if (cameraSendTimer) return;
+  if (!latestWorld || cameraSendTimer) return;
 
   cameraSendTimer = setTimeout(() => {
     worker.postMessage({
@@ -160,7 +172,7 @@ function sendCamera() {
       y: latestWorld.camera.y,
     });
     cameraSendTimer = null;
-  }, 33); // throttle camera sync to ~30Hz
+  }, 33);
 }
 
 window.addEventListener('keydown', (e) => {
@@ -205,7 +217,7 @@ canvas.addEventListener('wheel', (e) => {
     canvas.clientWidth / (latestWorld.width || 1200),
     canvas.clientHeight / (latestWorld.height || 720),
   );
-  const min = Math.max(0.3, fitMin); // keep viewport fully populated
+  const min = Math.max(0.3, fitMin);
   const max = 8;
   const nextZoom = Math.max(min, Math.min(max, latestWorld.camera.zoom - delta * step));
   latestWorld.camera.zoom = nextZoom;

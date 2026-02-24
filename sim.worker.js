@@ -84,6 +84,29 @@ function listToMap(list) {
   return m;
 }
 
+function shallowEqualObj(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const ak = Object.keys(a);
+  const bk = Object.keys(b);
+  if (ak.length !== bk.length) return false;
+  for (const k of ak) {
+    const av = a[k];
+    const bv = b[k];
+    if (av && bv && typeof av === 'object' && typeof bv === 'object') {
+      if (!shallowEqualObj(av, bv)) return false;
+      continue;
+    }
+    if (av !== bv) return false;
+  }
+  return true;
+}
+
+function entityChanged(old, cur) {
+  if (!old) return true;
+  return !shallowEqualObj(old, cur);
+}
+
 function diffLists(prevList, nextList) {
   const prev = listToMap(prevList);
   const next = listToMap(nextList);
@@ -92,7 +115,7 @@ function diffLists(prevList, nextList) {
 
   for (const [id, cur] of next.entries()) {
     const old = prev.get(id);
-    if (!old || JSON.stringify(old) !== JSON.stringify(cur)) upserts.push(cur);
+    if (entityChanged(old, cur)) upserts.push(cur);
   }
   for (const id of prev.keys()) {
     if (!next.has(id)) removes.push(id);

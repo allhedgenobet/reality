@@ -9,17 +9,34 @@ export function createRenderer(canvas) {
   const DEFAULT_CANVAS_WIDTH = 800;
   const DEFAULT_CANVAS_HEIGHT = 600;
 
-  function resize() {
+  let lastDpr = 0;
+
+  function resize(force = false) {
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    canvasW = rect.width || canvas.offsetWidth || DEFAULT_CANVAS_WIDTH;
-    canvasH = rect.height || canvas.offsetHeight || DEFAULT_CANVAS_HEIGHT;
-    canvas.width = canvasW * dpr;
-    canvas.height = canvasH * dpr;
+    const nextW = rect.width || canvas.offsetWidth || DEFAULT_CANVAS_WIDTH;
+    const nextH = rect.height || canvas.offsetHeight || DEFAULT_CANVAS_HEIGHT;
+
+    const changed =
+      force ||
+      nextW !== canvasW ||
+      nextH !== canvasH ||
+      dpr !== lastDpr ||
+      canvas.width !== Math.floor(nextW * dpr) ||
+      canvas.height !== Math.floor(nextH * dpr);
+
+    if (!changed) return;
+
+    canvasW = nextW;
+    canvasH = nextH;
+    lastDpr = dpr;
+    canvas.width = Math.floor(canvasW * dpr);
+    canvas.height = Math.floor(canvasH * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   window.addEventListener('resize', () => {
+    resize(true);
     if (lastWorld) render(lastWorld);
   });
 
