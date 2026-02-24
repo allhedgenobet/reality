@@ -34,8 +34,9 @@ function createBaseGenes() {
   return {
     branchBias: 1 + (Math.random() * 2 - 1) * 0.22,
     stopBias: 1 + (Math.random() * 2 - 1) * 0.22,
-    jitter: 0.045 + (Math.random() * 2 - 1) * 0.02,
-    turnBias: (Math.random() * 2 - 1) * 0.012,
+    jitter: 0.035 + (Math.random() * 2 - 1) * 0.015,
+    turnBias: (Math.random() * 2 - 1) * 0.02,
+    curl: 0.012 + Math.random() * 0.035,
     vigor: 1 + (Math.random() * 2 - 1) * 0.24,
     hue: 120 + (Math.random() * 2 - 1) * 18,
     glow: 1 + (Math.random() * 2 - 1) * 0.2,
@@ -46,8 +47,9 @@ function mutateGenes(parent, m = 0.1) {
   return {
     branchBias: clamp(parent.branchBias + (Math.random() * 2 - 1) * m, 0.45, 1.95),
     stopBias: clamp(parent.stopBias + (Math.random() * 2 - 1) * m, 0.4, 2.0),
-    jitter: clamp(parent.jitter + (Math.random() * 2 - 1) * m * 0.09, 0.008, 0.11),
-    turnBias: clamp(parent.turnBias + (Math.random() * 2 - 1) * m * 0.03, -0.055, 0.055),
+    jitter: clamp(parent.jitter + (Math.random() * 2 - 1) * m * 0.09, 0.006, 0.09),
+    turnBias: clamp(parent.turnBias + (Math.random() * 2 - 1) * m * 0.035, -0.08, 0.08),
+    curl: clamp(parent.curl + (Math.random() * 2 - 1) * m * 0.05, 0.004, 0.07),
     vigor: clamp(parent.vigor + (Math.random() * 2 - 1) * m * 1.25, 0.5, 1.9),
     hue: clamp(parent.hue + (Math.random() * 2 - 1) * m * 24, 85, 150),
     glow: clamp(parent.glow + (Math.random() * 2 - 1) * m * 0.7, 0.65, 1.45),
@@ -387,9 +389,10 @@ function step() {
     }
 
     const jitter = (Math.random() * 2 - 1) * g.jitter;
-    t.angle += jitter + wind + g.turnBias;
+    const curlDir = Math.sin((t.x + t.y) * 0.01) >= 0 ? 1 : -1;
+    t.angle += jitter + wind * 0.55 + g.turnBias + curlDir * g.curl;
 
-    const stepLen = (1.1 + Math.random() * 0.9) * (0.85 + 0.18 * g.vigor);
+    const stepLen = (0.8 + Math.random() * 0.65) * (0.85 + 0.18 * g.vigor);
     const nx = t.x + Math.cos(t.angle) * stepLen;
     const ny = t.y + Math.sin(t.angle) * stepLen;
 
@@ -417,9 +420,10 @@ function step() {
     t.width *= 0.9983;
 
     const crowdingFactor = 1 / (1 + competition * 3.5);
-    const bChance = branchChance * 0.72 * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias * crowdingFactor;
+    const bChance = branchChance * 0.88 * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias * crowdingFactor;
     if (Math.random() < bChance && t.width > 0.45 && t.energy > 15) {
-      const split = 0.2 + Math.random() * 0.55;
+      // maze-like splits: mostly orthogonal-ish branch turns
+      const split = (Math.PI * 0.5) * (0.75 + Math.random() * 0.35);
       const childGenesA = mutateGenes(g, 0.08);
       const childGenesB = mutateGenes(g, 0.08);
       const childA = new Tip(t.x, t.y, t.angle - split, t.width * (0.72 + Math.random() * 0.12), t.energy * 0.63, childGenesA);
