@@ -25,7 +25,7 @@ function createBaseGenes() {
     branchBias: 1 + (Math.random() * 2 - 1) * 0.18,
     stopBias: 1 + (Math.random() * 2 - 1) * 0.18,
     jitter: 0.045 + (Math.random() * 2 - 1) * 0.015,
-    upwardBias: 0.014 + (Math.random() * 2 - 1) * 0.005,
+    turnBias: (Math.random() * 2 - 1) * 0.01,
     vigor: 1 + (Math.random() * 2 - 1) * 0.2,
   };
 }
@@ -35,7 +35,7 @@ function mutateGenes(parent, m = 0.06) {
     branchBias: clamp(parent.branchBias + (Math.random() * 2 - 1) * m, 0.55, 1.7),
     stopBias: clamp(parent.stopBias + (Math.random() * 2 - 1) * m, 0.5, 1.8),
     jitter: clamp(parent.jitter + (Math.random() * 2 - 1) * m * 0.08, 0.01, 0.09),
-    upwardBias: clamp(parent.upwardBias + (Math.random() * 2 - 1) * m * 0.02, 0.004, 0.03),
+    turnBias: clamp(parent.turnBias + (Math.random() * 2 - 1) * m * 0.02, -0.04, 0.04),
     vigor: clamp(parent.vigor + (Math.random() * 2 - 1) * m * 1.1, 0.6, 1.6),
   };
 }
@@ -56,7 +56,7 @@ let tips = [];
 let segments = 0;
 
 function spawnTree(x, y, scale = 1, inheritedGenes = null) {
-  const angle = -Math.PI / 2 + (Math.random() * 2 - 1) * 0.07;
+  const angle = Math.random() * Math.PI * 2;
   const genes = inheritedGenes ? mutateGenes(inheritedGenes, 0.08) : createBaseGenes();
   const width = (2.1 + Math.random() * 0.9) * scale * genes.vigor;
   const energy = (280 + Math.random() * 170) * scale * genes.vigor;
@@ -109,8 +109,7 @@ function step() {
     }
 
     const jitter = (Math.random() * 2 - 1) * g.jitter;
-    const upwardBias = (-Math.PI / 2 - t.angle) * g.upwardBias;
-    t.angle += jitter + wind + upwardBias;
+    t.angle += jitter + wind + g.turnBias;
 
     const stepLen = (2.1 + Math.random() * 1.5) * (0.9 + 0.25 * g.vigor);
     const nx = t.x + Math.cos(t.angle) * stepLen;
