@@ -5,7 +5,7 @@ A minimalist 2D generative branching tree on a black background.
 - Green neon branches
 - Random branching
 - Random branch termination (some branches stop growing)
-- Click to plant one tree exactly at the cursor
+- No auto-spawn/reseed; click to drop a seed and germinate a tree
 - Slow self-reproduction via occasional seed drops
 - Heritable growth traits with small mutations each generation
 

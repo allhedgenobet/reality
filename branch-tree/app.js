@@ -68,11 +68,7 @@ function reset() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight);
 
-  const w = window.innerWidth;
-  const h = window.innerHeight;
   tips = [];
-
-  spawnTree(w * 0.5, h - 14, 1.0);
   segments = 0;
 }
 
@@ -181,8 +177,6 @@ function loop() {
 
   if (tips.length > 0) {
     for (let i = 0; i < 3; i++) step();
-  } else {
-    spawnTree(window.innerWidth * 0.5, window.innerHeight - 14, 1.0);
   }
 
   requestAnimationFrame(loop);
@@ -195,7 +189,16 @@ canvas.addEventListener('pointerdown', (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  spawnTree(x, y, 0.85 + Math.random() * 0.35);
+
+  // Drop a visible seed, then germinate.
+  ctx.fillStyle = 'rgba(150,255,150,0.85)';
+  ctx.beginPath();
+  ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  setTimeout(() => {
+    spawnTree(x, y, 0.85 + Math.random() * 0.35);
+  }, 110);
 });
 
 reset();
