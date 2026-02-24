@@ -75,7 +75,7 @@ export function createRenderer(canvas) {
     ctx.fillStyle = fog;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    const { position, agent, predator, apex, coral, titan, burst, resource, forceField } = ecs.components;
+    const { position, agent, predator, apex, coral, titan, decomposer, burst, resource, forceField } = ecs.components;
 
     // Camera transform (zoom + pan around world.camera.x/y)
     // Use canvas CSS dimensions so the camera center maps to the canvas center.
@@ -543,6 +543,26 @@ export function createRenderer(canvas) {
         ctx.arc(pos.x, pos.y, radius + 2, 0, Math.PI * 2);
         ctx.stroke();
       }
+    }
+
+    // Draw decomposers as low-glow teal motes
+    for (const [id, dc] of decomposer.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      const hue = (dc.colorHue ?? 120) + wobbleHue + stormHueShift;
+      const energy = dc.energy ?? 1;
+      const age = dc.age ?? 0;
+      const radius = 3 + Math.min(2.2, energy * 1.6) + (age > 15 ? 0.6 : 0);
+
+      ctx.fillStyle = `hsla(${hue}, ${70 + wobbleSat + stormSatBoost}%, ${60 + wobbleLight + stormLightShift}%, 0.9)`;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `hsla(${hue + 40}, 85%, 80%, 0.4)`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, radius + 1.5, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     // Restore camera transform

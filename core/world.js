@@ -36,6 +36,7 @@ export function createWorld(rng) {
   const APEX_COUNT = 12;
   const CORAL_COUNT = 0;
   const TITAN_COUNT = 0;
+  const DECOMPOSER_COUNT = 32;
   const RESOURCE_COUNT = 2200;
 
   function clamp(value, min, max) {
@@ -245,6 +246,38 @@ export function createWorld(rng) {
     return id;
   }
 
+  function makeDecomposer(x, y, parentDna) {
+    const id = ecs.createEntity();
+    ecs.components.position.set(id, { x, y });
+
+    const dna = parentDna
+      ? {
+          speed: clamp(parentDna.speed + (rng.float() - 0.5) * 0.12, 0.55, 1.4),
+          sense: clamp(parentDna.sense + (rng.float() - 0.5) * 0.12, 0.7, 1.6),
+          metabolism: clamp(parentDna.metabolism + (rng.float() - 0.5) * 0.12, 0.6, 1.4),
+          hueShift: clamp(parentDna.hueShift + rng.int(-4, 4), -40, 40),
+        }
+      : {
+          speed: 0.75 + rng.float() * 0.35,
+          sense: 0.9 + rng.float() * 0.35,
+          metabolism: 0.9 + rng.float() * 0.3,
+          hueShift: rng.int(-24, 24),
+        };
+
+    const speed = 32 * dna.speed;
+    ecs.components.velocity.set(id, {
+      vx: (rng.float() - 0.5) * speed,
+      vy: (rng.float() - 0.5) * speed,
+    });
+    ecs.components.decomposer.set(id, {
+      colorHue: 120 + dna.hueShift,
+      energy: 1.1,
+      age: 0,
+      dna,
+    });
+    return id;
+  }
+
   function makeResource(x, y, kind = 'plant') {
     const id = ecs.createEntity();
     ecs.components.position.set(id, { x, y });
@@ -324,6 +357,10 @@ export function createWorld(rng) {
 
   for (let i = 0; i < TITAN_COUNT; i++) {
     makeTitan(rng.float() * width, rng.float() * height);
+  }
+
+  for (let i = 0; i < DECOMPOSER_COUNT; i++) {
+    makeDecomposer(rng.float() * width, rng.float() * height);
   }
 
   for (let i = 0; i < RESOURCE_COUNT; i++) {
@@ -410,9 +447,9 @@ export function createWorld(rng) {
 
   // Simple soft-body collisions using typed lanes (phase 5 foundation).
   function collisionSystem(dt) {
-    const { position, velocity, agent, predator, apex, coral, titan } = ecs.components;
+    const { position, velocity, agent, predator, apex, coral, titan, decomposer } = ecs.components;
 
-    const total = agent.size + predator.size + apex.size + coral.size + titan.size;
+    const total = agent.size + predator.size + apex.size + coral.size + titan.size + decomposer.size;
     if (total <= 1) return;
 
     const ids = new Uint32Array(total);
@@ -439,6 +476,7 @@ export function createWorld(rng) {
     for (const [id, ap] of apex.entries()) push(id, 9 + (ap.energy ?? 3) * 2);
     for (const [id, cr] of coral.entries()) push(id, 5 + (cr.energy ?? 1.5) * 2);
     for (const [id, tt] of titan.entries()) push(id, 10 + (tt.energy ?? 4) * 2.2);
+    for (const [id, dc] of decomposer.entries()) push(id, 5 + (dc.energy ?? 1.2) * 1.8);
 
     if (n <= 1) return;
 
@@ -498,7 +536,7 @@ export function createWorld(rng) {
 
   // Steering: agents seek nearest resource and gently adjust velocity.
   function steeringSystem(dt) {
-    const { position, velocity, agent, predator, apex, coral, titan, resource } = ecs.components;
+    const { position, velocity, agent, predator, apex, coral, titan, decomposer, resource } = ecs.components;
     const avoidRadius = 18;
 
     // Build spatial indexes once per tick for local neighbor queries
@@ -542,6 +580,14 @@ export function createWorld(rng) {
       apexList.push({ id, pos, data: ap });
     }
     const apexGrid = buildSpatialIndex(apexList, 0);
+
+    const decomposerList = [];
+    for (const [id, dc] of decomposer.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      decomposerList.push({ id, pos, data: dc });
+    }
+    const decomposerGrid = buildSpatialIndex(decomposerList, 0);
 
     // Phase 5 typed lanes for mover species (reduces iterator/object churn in hot steering loops)
     const predatorPos = new Array(predator.size);
@@ -606,6 +652,22 @@ export function createWorld(rng) {
       titanDna[titanN] = tt.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       titanRest[titanN] = tt.rest || 0;
       titanN++;
+    }
+
+    const decomposerIds = new Array(decomposer.size);
+    const decomposerPos = new Array(decomposer.size);
+    const decomposerVel = new Array(decomposer.size);
+    const decomposerDna = new Array(decomposer.size);
+    let decomposerN = 0;
+    for (const [id, dc] of decomposer.entries()) {
+      const pos = position.get(id);
+      const vel = velocity.get(id);
+      if (!pos || !vel) continue;
+      decomposerIds[decomposerN] = id;
+      decomposerPos[decomposerN] = pos;
+      decomposerVel[decomposerN] = vel;
+      decomposerDna[decomposerN] = dc.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+      decomposerN++;
     }
 
     for (const [id, ag] of agent.entries()) {
@@ -827,11 +889,66 @@ export function createWorld(rng) {
       }
     }
 
+    // Decomposers drift toward depleted resources to recycle nutrients
+    const decomposerSeekRadius = 160;
+    for (let di = 0; di < decomposerN; di++) {
+      const pos = decomposerPos[di];
+      const vel = decomposerVel[di];
+      const dna = decomposerDna[di];
+      const seekRadius = decomposerSeekRadius * dna.sense;
+
+      let target = null;
+      let targetDist2 = Infinity;
+      const nearbyResources = querySpatial(resourceGrid, pos.x, pos.y, seekRadius);
+      for (const r of nearbyResources) {
+        if ((r.data.amount ?? 1) > 0.75) continue;
+        const dx = r.pos.x - pos.x;
+        const dy = r.pos.y - pos.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < targetDist2 && d2 < seekRadius * seekRadius) {
+          targetDist2 = d2;
+          target = r.pos;
+        }
+      }
+
+      if (target) {
+        const dx = target.x - pos.x;
+        const dy = target.y - pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const desiredSpeed = 30 * dna.speed;
+        const desiredVx = (dx / dist) * desiredSpeed;
+        const desiredVy = (dy / dist) * desiredSpeed;
+        const blend = 0.7;
+        vel.vx = vel.vx * blend + desiredVx * (1 - blend);
+        vel.vy = vel.vy * blend + desiredVy * (1 - blend);
+      } else {
+        // Mild jitter to keep them moving when idle
+        vel.vx += (rng.float() - 0.5) * 4 * dt;
+        vel.vy += (rng.float() - 0.5) * 4 * dt;
+      }
+
+      // Avoid piling up with other decomposers
+      const nearbyDecomposers = querySpatial(decomposerGrid, pos.x, pos.y, avoidRadius);
+      for (const other of nearbyDecomposers) {
+        if (other.id === decomposerIds[di]) continue;
+        const p2 = other.pos;
+        const dx = pos.x - p2.x;
+        const dy = pos.y - p2.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > 0 && d2 < avoidRadius * avoidRadius) {
+          const dist = Math.sqrt(d2) || 1;
+          const strength = (avoidRadius - dist) / avoidRadius;
+          vel.vx += (dx / dist) * strength * 18 * dt;
+          vel.vy += (dy / dist) * strength * 18 * dt;
+        }
+      }
+    }
+
   }
 
   // Metabolism & eating: agents lose energy over time, gain by consuming resources.
   function metabolismSystem(dt) {
-    const { position, agent, predator, apex, coral, titan, resource, burst } = ecs.components;
+    const { position, agent, predator, apex, coral, titan, decomposer, resource, burst } = ecs.components;
     const eatRadius = 10;
     const baseDrain = 0.03 * world.globals.metabolism; // per second, modulated by regime
 
@@ -905,6 +1022,13 @@ export function createWorld(rng) {
       titanLane.push({ id, tt, pos });
     }
 
+    const decomposerLane = [];
+    for (const [id, dc] of decomposer.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      decomposerLane.push({ id, dc, pos });
+    }
+
     for (const [id, ag] of agent.entries()) {
       const dna = ag.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       ag.energy -= baseDrain * dna.metabolism * dt;
@@ -925,6 +1049,33 @@ export function createWorld(rng) {
           const bite = Math.min(0.6, res.amount);
           res.amount -= bite;
           ag.energy = Math.min(2.0, ag.energy + bite); // allow some over-fullness
+        }
+      }
+    }
+
+    // Decomposers recycle depleted resources to regain energy
+    const decomposerEatRadius = 10;
+    const decomposerDrain = baseDrain * 1.1;
+    for (const lane of decomposerLane) {
+      const dc = lane.dc;
+      const dpos = lane.pos;
+      const dna = dc.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
+
+      dc.energy -= decomposerDrain * dna.metabolism * dt;
+      if (dc.energy < 0) dc.energy = 0;
+
+      const nearbyResources = querySpatial(resourceGrid, dpos.x, dpos.y, decomposerEatRadius);
+      for (const r of nearbyResources) {
+        const res = r.data;
+        if (res.amount >= 1) continue;
+        const rpos = r.pos;
+        const dx = rpos.x - dpos.x;
+        const dy = rpos.y - dpos.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < decomposerEatRadius * decomposerEatRadius) {
+          const replenish = Math.min(0.45 * dt, 1 - res.amount);
+          res.amount += replenish;
+          dc.energy = Math.min(2.0, dc.energy + replenish * 1.4);
         }
       }
     }
@@ -1203,7 +1354,7 @@ export function createWorld(rng) {
 
   // Reproduction & growth.
   function lifeCycleSystem(dt) {
-    const { position, velocity, agent, predator, apex, coral, titan, burst } = ecs.components;
+    const { position, velocity, agent, predator, apex, coral, titan, decomposer, burst } = ecs.components;
 
     // Herbivore lifecycle
     for (const [id, ag] of Array.from(agent.entries())) {
@@ -1328,6 +1479,27 @@ export function createWorld(rng) {
       }
 
       if (tt.energy <= 0) {
+        ecs.destroyEntity(id);
+      }
+    }
+
+    // Decomposer lifecycle: breed modestly, die when starved
+    for (const [id, dc] of Array.from(decomposer.entries())) {
+      dc.age = (dc.age || 0) + dt;
+      if (dc.energy >= 1.6 && dc.age > 9) {
+        const pos = position.get(id);
+        const vel = velocity.get(id);
+        if (pos && vel) {
+          const jitter = () => (rng.float() - 0.5) * 8;
+          const childId = makeDecomposer(pos.x + jitter(), pos.y + jitter(), dc.dna);
+          const childVel = velocity.get(childId);
+          childVel.vx = vel.vx + jitter();
+          childVel.vy = vel.vy + jitter();
+          dc.energy *= 0.55;
+        }
+      }
+
+      if (dc.energy <= 0) {
         ecs.destroyEntity(id);
       }
     }

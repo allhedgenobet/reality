@@ -14,7 +14,7 @@ let lastRenderAt = 0;
 
 const worker = new Worker(new URL('./sim.worker.js?v=20260224-1', import.meta.url), { type: 'module' });
 
-const COMPONENT_NAMES = ['agent', 'predator', 'apex', 'coral', 'titan', 'burst', 'resource', 'forceField'];
+const COMPONENT_NAMES = ['agent', 'predator', 'apex', 'coral', 'titan', 'decomposer', 'burst', 'resource', 'forceField'];
 
 const state = {
   tick: 0,
@@ -44,6 +44,7 @@ function ensureRenderWorld() {
         apex: new Map(),
         coral: new Map(),
         titan: new Map(),
+        decomposer: new Map(),
         burst: new Map(),
         resource: new Map(),
         forceField: new Map(),
@@ -58,6 +59,7 @@ function toRenderData(name, e) {
   if (name === 'apex') return { colorHue: e.colorHue, energy: e.energy, age: e.age };
   if (name === 'coral') return { colorHue: e.colorHue, energy: e.energy, age: e.age, dna: e.dna };
   if (name === 'titan') return { colorHue: e.colorHue, energy: e.energy, age: e.age };
+  if (name === 'decomposer') return { colorHue: e.colorHue, energy: e.energy, age: e.age };
   if (name === 'burst') return { life: e.life, hue: e.hue };
   if (name === 'resource') return { kind: e.kind, amount: e.amount, age: e.age, cycles: e.cycles, dna: e.dna };
   if (name === 'forceField') return { strength: e.strength, radius: e.radius };
