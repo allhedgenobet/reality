@@ -83,18 +83,18 @@ function drawSegment(x1, y1, x2, y2, width, genes, glow = 1, burning = 0) {
   const h = genes?.hue ?? 120;
   const g = genes?.glow ?? 1;
   const fireMix = clamp(burning, 0, 1);
-  const hue = h * (1 - fireMix) + 22 * fireMix;
+  const hue = h * (1 - fireMix) + 18 * fireMix;
   const sat = 100;
-  const lightA = 72 * (1 - fireMix) + 62 * fireMix;
-  const lightB = 60 * (1 - fireMix) + 50 * fireMix;
-  ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${lightA}%, ${0.08 * glow * g})`;
+  const lightA = 72 * (1 - fireMix) + 64 * fireMix;
+  const lightB = 60 * (1 - fireMix) + 54 * fireMix;
+  ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${lightA}%, ${0.1 * glow * g})`;
   ctx.lineWidth = width * 3;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
   ctx.stroke();
 
-  ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${lightB}%, ${(0.7 + fireMix * 0.2) * glow * g})`;
+  ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${lightB}%, ${(0.82 + fireMix * 0.16) * glow * g})`;
   ctx.lineWidth = width;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
@@ -254,7 +254,8 @@ function step() {
 }
 
 function loop() {
-  ctx.fillStyle = 'rgba(0,0,0,0.02)';
+  // Much slower fade so branches persist visually instead of washing out quickly.
+  ctx.fillStyle = 'rgba(0,0,0,0.006)';
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
   if (tips.length > 0) {
