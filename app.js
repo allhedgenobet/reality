@@ -116,7 +116,7 @@ worker.onmessage = (e) => {
   buildRenderWorld();
   tickLabel.textContent = `Tick: ${state.tick}`;
   seedValue.textContent = state.seed;
-  perfLabel.textContent = `FPS: ${state.perf.fps.toFixed(0)} | Step: ${state.perf.avgStepMs.toFixed(2)}ms | Q: ${Math.round((state.perf.effectQuality ?? 1) * 100)}%`;
+  perfLabel.textContent = `FPS: ${state.perf.fps.toFixed(0)} | Step: ${state.perf.avgStepMs.toFixed(2)}ms | Q: ${Math.round((state.perf.effectQuality ?? 1) * 100)}% | S:${state.perf.updateStride ?? 1}`;
 };
 
 function drawLoop() {

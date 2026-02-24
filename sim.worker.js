@@ -48,7 +48,7 @@ function buildSnapshot() {
     height: world.height,
     regime: world.regime,
     camera: world.camera,
-    perf: { fps, avgStepMs, effectQuality: world.globals.effectQuality ?? 1 },
+    perf: { fps, avgStepMs, effectQuality: world.globals.effectQuality ?? 1, updateStride: world.globals.updateStride ?? 1 },
     components: {
       agent: toList(c.agent, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age, evolved: d.evolved, caste: d.caste })),
       predator: toList(c.predator, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
@@ -127,11 +127,24 @@ function postSnapshot(now, force = false) {
   prevSnapshot = full;
 }
 
+function getCreatureCount() {
+  const c = world.ecs.components;
+  return c.agent.size + c.predator.size + c.apex.size + c.coral.size + c.titan.size;
+}
+
+function updateLodControls() {
+  const n = getCreatureCount();
+  if (n > 9000) world.globals.updateStride = 3;
+  else if (n > 3500) world.globals.updateStride = 2;
+  else world.globals.updateStride = 1;
+}
+
 function stepFrame(now) {
   const elapsed = now - lastTime;
   lastTime = now;
 
   if (running) {
+    updateLodControls();
     accum += Math.min(elapsed, 200);
     let steps = 0;
     while (accum >= MS_PER_TICK && steps < 8) {

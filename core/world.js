@@ -26,6 +26,7 @@ export function createWorld(rng) {
       reproductionThreshold: 1.6,
       chaosLevel: 0.35,
       effectQuality: 1,
+      updateStride: 1,
     },
   };
 
@@ -1274,9 +1275,15 @@ export function createWorld(rng) {
 
   function step(dt) {
     world.tick++;
-    steeringSystem(dt);
-    forceFieldSystem(dt);
-    collisionSystem(dt);
+    const stride = Math.max(1, world.globals.updateStride || 1);
+    const doHeavy = (world.tick % stride) === 0;
+
+    if (doHeavy) {
+      steeringSystem(dt * stride);
+      forceFieldSystem(dt * stride);
+      collisionSystem(dt * stride);
+    }
+
     physicsSystem(dt);
     metabolismSystem(dt);
     ecologySystem(dt);
