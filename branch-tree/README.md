@@ -10,6 +10,7 @@ A minimalist 2D generative branching tree on a black background.
 - Heritable growth traits with small mutations each generation
 - Grazer mechanic: dense clusters attract wandering grazers (small circular units) that eat branches
 - Grazers can reproduce in dense feeding zones
+- Added a higher trophic predator level that hunts grazers
 
 ## Run
 

@@ -60,6 +60,7 @@ class Tip {
 let tips = [];
 let segments = 0;
 let grazers = [];
+let predators = [];
 
 function spawnTree(x, y, scale = 1, inheritedGenes = null) {
   const angle = Math.random() * Math.PI * 2;
@@ -76,6 +77,7 @@ function reset() {
 
   tips = [];
   grazers = [];
+  predators = [];
   segments = 0;
 }
 
@@ -213,8 +215,90 @@ function updateGrazers() {
   }
 
   grazers.push(...newborn);
-  if (grazers.length > 220) grazers.splice(0, grazers.length - 220);
   grazers = grazers.filter((z) => z.life > 0.02);
+}
+
+function updatePredators() {
+  // Spawn predators when grazer population gets dense
+  if (grazers.length > 18 && Math.random() < 0.03) {
+    const g = grazers[(Math.random() * grazers.length) | 0];
+    if (g) {
+      const a = Math.random() * Math.PI * 2;
+      predators.push({
+        x: g.x + Math.cos(a) * 14,
+        y: g.y + Math.sin(a) * 14,
+        vx: Math.cos(a) * (0.45 + Math.random() * 0.45),
+        vy: Math.sin(a) * (0.45 + Math.random() * 0.45),
+        life: 1,
+        fadeRate: 0.0018 + Math.random() * 0.0025,
+        turniness: 0.025 + Math.random() * 0.05,
+        hunger: 0,
+      });
+    }
+  }
+
+  for (const p of predators) {
+    p.life -= p.fadeRate;
+    p.hunger += 0.004;
+
+    // Seek nearby grazers
+    let target = null;
+    let bestD2 = Infinity;
+    for (const g of grazers) {
+      const dx = g.x - p.x;
+      const dy = g.y - p.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD2 && d2 < 120 * 120) {
+        bestD2 = d2;
+        target = g;
+      }
+    }
+
+    if (target) {
+      const dx = target.x - p.x;
+      const dy = target.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      p.vx += (dx / d) * 0.08;
+      p.vy += (dy / d) * 0.08;
+
+      if (d < 8) {
+        // eat grazer
+        target.life -= 0.35;
+        p.hunger = Math.max(0, p.hunger - 0.45);
+        p.life = Math.min(1.2, p.life + 0.04);
+      }
+    }
+
+    p.vx += (Math.random() * 2 - 1) * p.turniness;
+    p.vy += (Math.random() * 2 - 1) * p.turniness;
+
+    const sp = Math.hypot(p.vx, p.vy) || 1;
+    const targetSpeed = 0.6 + p.hunger * 0.55;
+    p.vx = (p.vx / sp) * targetSpeed;
+    p.vy = (p.vy / sp) * targetSpeed;
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    if (p.x < 0 || p.x > window.innerWidth) p.vx *= -1;
+    if (p.y < 0 || p.y > window.innerHeight) p.vy *= -1;
+    p.x = clamp(p.x, 0, window.innerWidth);
+    p.y = clamp(p.y, 0, window.innerHeight);
+
+    // Predator render (small red-orange dot)
+    const r = 1.8 + p.life * 0.9;
+    ctx.fillStyle = `rgba(255,120,90,${0.55 * p.life + 0.15})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(120,35,20,${0.4 * p.life + 0.2})`;
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  predators = predators.filter((p) => p.life > 0.02);
 }
 
 function step() {
@@ -224,6 +308,7 @@ function step() {
 
   maybeSpawnGrazersFromDensity();
   updateGrazers();
+  updatePredators();
 
   const newTips = [];
 
@@ -316,7 +401,7 @@ function step() {
   avgVigor /= n;
   avgBranch /= n;
 
-  ui.stats.textContent = `active tips: ${tips.length} | segments: ${segments} | grazers:${grazers.length} | vigor:${avgVigor.toFixed(2)} | branch:${avgBranch.toFixed(2)}`;
+  ui.stats.textContent = `active tips: ${tips.length} | segments: ${segments} | grazers:${grazers.length} | predators:${predators.length} | vigor:${avgVigor.toFixed(2)} | branch:${avgBranch.toFixed(2)}`;
 }
 
 function loop() {
