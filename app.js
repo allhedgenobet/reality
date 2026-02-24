@@ -1,10 +1,4 @@
-import { createRng } from './core/rng.js?v=20260223-2';
-import { createWorld } from './core/world.js?v=20260223-2';
 import { createRenderer } from './core/render.js?v=20260223-2';
-
-let seedStr = String(Date.now());
-let rng = createRng(seedStr);
-let world = createWorld(rng);
 
 const canvas = document.getElementById('world');
 const renderer = createRenderer(canvas);
@@ -12,109 +6,103 @@ const tickLabel = document.getElementById('tickLabel');
 const seedValue = document.getElementById('seedValue');
 const perfLabel = document.getElementById('perfLabel');
 
-seedValue.textContent = seedStr;
-
-const DT = 0.06;
-const MS_PER_TICK = DT * 1000;
-let running = false;
-let lastTime = 0;
-let accum = 0;
+let running = true;
+let latestWorld = null;
 let rafId = null;
-let fps = 0;
-let frameCounter = 0;
-let fpsWindowStart = performance.now();
-let avgStepMs = 0;
 
-function isExtinct(currentWorld) {
-  const { agent, predator, apex, coral, titan } = currentWorld.ecs.components;
-  return agent.size === 0 && predator.size === 0 && apex.size === 0 && coral.size === 0 && titan.size === 0;
+const worker = new Worker(new URL('./sim.worker.js?v=20260223-3', import.meta.url), { type: 'module' });
+
+function mapFromList(list, shape = (v) => v) {
+  const m = new Map();
+  for (const item of list || []) {
+    const { id } = item;
+    m.set(id, shape(item));
+  }
+  return m;
 }
 
-function resetWorld() {
-  seedStr = String(Date.now());
-  rng = createRng(seedStr);
-  world = createWorld(rng);
-  seedValue.textContent = seedStr;
-  tickLabel.textContent = `Tick: ${world.tick}`;
-  renderer.render(world);
-}
+function worldFromSnapshot(s) {
+  const position = new Map();
+  const velocity = new Map();
 
-function loop(now) {
-  if (!running) return;
-
-  const elapsed = now - lastTime;
-  lastTime = now;
-  accum += Math.min(elapsed, 200);
-
-  while (accum >= MS_PER_TICK) {
-    const t0 = performance.now();
-    world.step(DT);
-    const stepMs = performance.now() - t0;
-    avgStepMs = avgStepMs * 0.9 + stepMs * 0.1;
-    accum -= MS_PER_TICK;
-
-    if (isExtinct(world)) {
-      resetWorld();
-      accum = 0;
-      break;
+  const pushPosVel = (list) => {
+    for (const e of list || []) {
+      position.set(e.id, { x: e.x, y: e.y });
+      velocity.set(e.id, { vx: e.vx ?? 0, vy: e.vy ?? 0 });
     }
-  }
+  };
 
-  frameCounter += 1;
-  if (now - fpsWindowStart >= 500) {
-    fps = (frameCounter * 1000) / (now - fpsWindowStart);
-    frameCounter = 0;
-    fpsWindowStart = now;
-  }
+  pushPosVel(s.components.agent);
+  pushPosVel(s.components.predator);
+  pushPosVel(s.components.apex);
+  pushPosVel(s.components.coral);
+  pushPosVel(s.components.titan);
+  pushPosVel(s.components.burst);
+  pushPosVel(s.components.resource);
+  pushPosVel(s.components.forceField);
 
-  tickLabel.textContent = `Tick: ${world.tick}`;
-  // Adaptive quality: lower effects when sim step cost rises.
-  if (avgStepMs > 10 || fps < 30) world.globals.effectQuality = 0.35;
-  else if (avgStepMs > 7 || fps < 45) world.globals.effectQuality = 0.6;
-  else if (avgStepMs > 5 || fps < 55) world.globals.effectQuality = 0.8;
-  else world.globals.effectQuality = 1;
-
-  perfLabel.textContent = `FPS: ${fps.toFixed(0)} | Step: ${avgStepMs.toFixed(2)}ms | Q: ${Math.round(world.globals.effectQuality * 100)}%`;
-  renderer.render(world);
-  rafId = requestAnimationFrame(loop);
+  return {
+    tick: s.tick,
+    width: s.width,
+    height: s.height,
+    regime: s.regime,
+    camera: { ...s.camera },
+    ecs: {
+      components: {
+        position,
+        velocity,
+        agent: mapFromList(s.components.agent, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age, dna: e.dna, evolved: e.evolved, caste: e.caste })),
+        predator: mapFromList(s.components.predator, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age, rest: e.rest, dna: e.dna })),
+        apex: mapFromList(s.components.apex, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age, rest: e.rest, dna: e.dna })),
+        coral: mapFromList(s.components.coral, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age, rest: e.rest, dna: e.dna })),
+        titan: mapFromList(s.components.titan, (e) => ({ colorHue: e.colorHue, energy: e.energy, age: e.age, rest: e.rest, dna: e.dna })),
+        burst: mapFromList(s.components.burst, (e) => ({ life: e.life, hue: e.hue })),
+        resource: mapFromList(s.components.resource, (e) => ({ kind: e.kind, amount: e.amount, age: e.age, cycles: e.cycles, dna: e.dna })),
+        forceField: mapFromList(s.components.forceField, (e) => ({ strength: e.strength, radius: e.radius })),
+      },
+    },
+  };
 }
 
-function start() {
-  if (running) return;
-  running = true;
-  lastTime = performance.now();
-  accum = 0;
-  rafId = requestAnimationFrame(loop);
+worker.onmessage = (e) => {
+  if (e.data?.type !== 'snapshot') return;
+  const s = e.data.snapshot;
+  latestWorld = worldFromSnapshot(s);
+  tickLabel.textContent = `Tick: ${s.tick}`;
+  seedValue.textContent = s.seed;
+  perfLabel.textContent = `FPS: ${s.perf.fps.toFixed(0)} | Step: ${s.perf.avgStepMs.toFixed(2)}ms | Q: ${Math.round((s.perf.effectQuality ?? 1) * 100)}%`;
+};
+
+function drawLoop() {
+  if (latestWorld) renderer.render(latestWorld);
+  rafId = requestAnimationFrame(drawLoop);
 }
 
-function pause() {
-  if (!running) return;
-  running = false;
-  cancelAnimationFrame(rafId);
+function toggleRun() {
+  running = !running;
+  worker.postMessage({ type: running ? 'resume' : 'pause' });
 }
 
-// Minimal controls: space toggles pause/play, wheel zooms.
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Space') return;
   e.preventDefault();
-  if (running) pause(); else start();
+  toggleRun();
 });
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (!latestWorld) return;
   const delta = Math.sign(e.deltaY);
   const step = 0.1;
   const fitMin = Math.max(
-    canvas.clientWidth / world.width,
-    canvas.clientHeight / world.height,
+    canvas.clientWidth / (latestWorld.width || 1200),
+    canvas.clientHeight / (latestWorld.height || 720),
   );
   const min = Math.max(0.3, fitMin);
   const max = 4;
-  world.camera.zoom = Math.max(min, Math.min(max, world.camera.zoom - delta * step));
-  if (!running) renderer.render(world);
+  const nextZoom = Math.max(min, Math.min(max, latestWorld.camera.zoom - delta * step));
+  latestWorld.camera.zoom = nextZoom;
+  worker.postMessage({ type: 'setZoom', zoom: nextZoom });
 }, { passive: false });
 
-requestAnimationFrame(() => {
-  renderer.render(world);
-  start();
-});
+rafId = requestAnimationFrame(drawLoop);
