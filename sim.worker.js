@@ -29,13 +29,12 @@ function resetWorld() {
   world = createWorld(rng);
 }
 
-function toList(map, position, velocity, extra = null) {
+function toList(map, position, pick) {
   const out = [];
   for (const [id, data] of map.entries()) {
     const pos = position.get(id);
     if (!pos) continue;
-    const v = velocity?.get(id) || null;
-    out.push({ id, x: pos.x, y: pos.y, vx: v?.vx ?? 0, vy: v?.vy ?? 0, ...(data || {}), ...(extra ? extra(data) : {}) });
+    out.push({ id, x: pos.x, y: pos.y, ...(pick ? pick(data) : {}) });
   }
   return out;
 }
@@ -51,14 +50,14 @@ function buildSnapshot() {
     camera: world.camera,
     perf: { fps, avgStepMs, effectQuality: world.globals.effectQuality ?? 1 },
     components: {
-      agent: toList(c.agent, c.position, c.velocity),
-      predator: toList(c.predator, c.position, c.velocity),
-      apex: toList(c.apex, c.position, c.velocity),
-      coral: toList(c.coral, c.position, c.velocity),
-      titan: toList(c.titan, c.position, c.velocity),
-      burst: toList(c.burst, c.position, null),
-      resource: toList(c.resource, c.position, null),
-      forceField: toList(c.forceField, c.position, null),
+      agent: toList(c.agent, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age, evolved: d.evolved, caste: d.caste })),
+      predator: toList(c.predator, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
+      apex: toList(c.apex, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
+      coral: toList(c.coral, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age, dna: d.dna ? { venom: d.dna.venom } : undefined })),
+      titan: toList(c.titan, c.position, (d) => ({ colorHue: d.colorHue, energy: d.energy, age: d.age })),
+      burst: toList(c.burst, c.position, (d) => ({ life: d.life, hue: d.hue })),
+      resource: toList(c.resource, c.position, (d) => ({ kind: d.kind, amount: d.amount, age: d.age, cycles: d.cycles, dna: d.dna })),
+      forceField: toList(c.forceField, c.position, (d) => ({ strength: d.strength, radius: d.radius })),
     },
   };
 }

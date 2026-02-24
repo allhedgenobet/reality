@@ -25,21 +25,21 @@ function worldFromSnapshot(s) {
   const position = new Map();
   const velocity = new Map();
 
-  const pushPosVel = (list) => {
+  const pushPos = (list) => {
     for (const e of list || []) {
       position.set(e.id, { x: e.x, y: e.y });
-      velocity.set(e.id, { vx: e.vx ?? 0, vy: e.vy ?? 0 });
+      velocity.set(e.id, { vx: 0, vy: 0 });
     }
   };
 
-  pushPosVel(s.components.agent);
-  pushPosVel(s.components.predator);
-  pushPosVel(s.components.apex);
-  pushPosVel(s.components.coral);
-  pushPosVel(s.components.titan);
-  pushPosVel(s.components.burst);
-  pushPosVel(s.components.resource);
-  pushPosVel(s.components.forceField);
+  pushPos(s.components.agent);
+  pushPos(s.components.predator);
+  pushPos(s.components.apex);
+  pushPos(s.components.coral);
+  pushPos(s.components.titan);
+  pushPos(s.components.burst);
+  pushPos(s.components.resource);
+  pushPos(s.components.forceField);
 
   return {
     tick: s.tick,
