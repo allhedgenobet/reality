@@ -127,6 +127,14 @@ function step() {
       newTips.push(childA, childB);
     }
 
+    // Reproduction: mature branches can drop a nearby seed that starts a new tree.
+    const canReproduce = t.energy > 45 && t.width > 0.55;
+    if (canReproduce && Math.random() < 0.0015) {
+      const sx = t.x + (Math.random() * 2 - 1) * 90;
+      const sy = window.innerHeight - (6 + Math.random() * 16);
+      spawnTree(sx, sy, 0.62 + Math.random() * 0.35);
+    }
+
     if (t.x < -50 || t.x > window.innerWidth + 50 || t.y < -50 || t.y > window.innerHeight + 50) {
       t.alive = false;
     }
@@ -158,14 +166,7 @@ canvas.addEventListener('pointerdown', (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-
-  // Spawn a small cluster so clicks feel impactful
-  const sprouts = 1 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < sprouts; i++) {
-    const jx = (Math.random() * 2 - 1) * 18;
-    const jy = (Math.random() * 2 - 1) * 10;
-    spawnTree(x + jx, y + jy, 0.75 + Math.random() * 0.45);
-  }
+  spawnTree(x, y, 0.85 + Math.random() * 0.35);
 });
 
 reset();
