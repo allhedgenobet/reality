@@ -23,6 +23,7 @@ const TYPES = {
   INPUT: 'input',
   EXC: 'exc',
   INH: 'inh',
+  BG: 'bg',
   OUTPUT: 'output',
 };
 
@@ -36,9 +37,9 @@ function createNeuron(id, type, pathway, x, y) {
     v: -65,
     vRest: -65,
     vReset: -68,
-    vThresh: type === TYPES.OUTPUT ? -51 : -50,
-    tauM: type === TYPES.INH ? 14 : 18,
-    refSteps: type === TYPES.INH ? 2 : 3,
+    vThresh: type === TYPES.OUTPUT ? -51 : type === TYPES.BG ? -52 : -50,
+    tauM: type === TYPES.INH ? 14 : type === TYPES.BG ? 16 : 18,
+    refSteps: type === TYPES.INH ? 2 : type === TYPES.BG ? 2 : 3,
     refLeft: 0,
     inputCurrent: 0,
     spike: false,
@@ -70,6 +71,17 @@ function createModel() {
   const inh = [];
   for (let i = 0; i < 6; i++) inh.push(createNeuron(id++, TYPES.INH, 'shared', 560 + (i % 2) * 45, 180 + i * 45));
   neurons.push(...inh);
+
+  // Basal ganglia-style gating lanes (very simplified)
+  const goA = createNeuron(id++, TYPES.BG, 'A', 650, 170);
+  const noGoA = createNeuron(id++, TYPES.BG, 'A', 650, 240);
+  const gpiA = createNeuron(id++, TYPES.BG, 'A', 725, 205);
+
+  const goB = createNeuron(id++, TYPES.BG, 'B', 650, 400);
+  const noGoB = createNeuron(id++, TYPES.BG, 'B', 650, 470);
+  const gpiB = createNeuron(id++, TYPES.BG, 'B', 725, 435);
+
+  neurons.push(goA, noGoA, gpiA, goB, noGoB, gpiB);
 
   // Output populations (L5-ish decision readout)
   const outA = [];
@@ -115,6 +127,22 @@ function createModel() {
   connectDense(inh, outA, -1.2, -0.8, 1, false);
   connectDense(inh, outB, -1.2, -0.8, 1, false);
 
+  // Cortex (exc pools) -> BG striatal-like Go / NoGo channels
+  connectDense(excA, [goA], 0.75, 1.1, 1, true);
+  connectDense(excA, [noGoA], 0.45, 0.8, 1, true);
+  connectDense(excB, [goB], 0.75, 1.1, 1, true);
+  connectDense(excB, [noGoB], 0.45, 0.8, 1, true);
+
+  // Go disinhibits GPi-like gate, NoGo strengthens gate
+  addEdge(goA.id, gpiA.id, -1.2, 1, false);
+  addEdge(noGoA.id, gpiA.id, 0.95, 1, false);
+  addEdge(goB.id, gpiB.id, -1.2, 1, false);
+  addEdge(noGoB.id, gpiB.id, 0.95, 1, false);
+
+  // GPi-like tonic inhibition on outputs
+  connectDense([gpiA], outA, -1.4, -1.0, 1, false);
+  connectDense([gpiB], outB, -1.4, -1.0, 1, false);
+
   // Add simple delay buffer (fixed horizon)
   const maxDelay = 3;
   const delayBuffer = Array.from({ length: maxDelay + 1 }, () => []);
@@ -127,13 +155,15 @@ function createModel() {
     neurons,
     edges,
     byId,
-    groups: { inA, inB, excA, excB, inh, outA, outB },
+    groups: { inA, inB, excA, excB, inh, goA, noGoA, gpiA, goB, noGoB, gpiB, outA, outB },
     delayBuffer,
     bufferIndex: 0,
     dopamine: 0,
     lastChoice: '-',
     rasterA: [],
     rasterB: [],
+    bgGateA: 0,
+    bgGateB: 0,
   };
 }
 
@@ -234,6 +264,10 @@ function outputPopulationSpikeRate(pop) {
 function computeChoiceAndReward() {
   const rA = outputPopulationSpikeRate(M.groups.outA);
   const rB = outputPopulationSpikeRate(M.groups.outB);
+  const gateA = M.groups.gpiA.spike ? 1 : 0;
+  const gateB = M.groups.gpiB.spike ? 1 : 0;
+  M.bgGateA = gateA;
+  M.bgGateB = gateB;
 
   let choice = '-';
   if (rA > 0 || rB > 0) choice = rA >= rB ? 'A' : 'B';
@@ -316,6 +350,7 @@ function drawNode(n) {
     [TYPES.INPUT]: '#67b6ff',
     [TYPES.EXC]: '#8f7cff',
     [TYPES.INH]: '#ff9a9a',
+    [TYPES.BG]: n.pathway === 'A' ? '#61e4f5' : '#f5b761',
     [TYPES.OUTPUT]: n.pathway === 'A' ? '#82ffa7' : '#ffd083',
   };
 
@@ -345,6 +380,7 @@ function drawLabels() {
   ctx.fillText('Excitatory pool A (L2/3-ish)', 265, 90);
   ctx.fillText('Excitatory pool B (L2/3-ish)', 265, 360);
   ctx.fillText('Interneurons (shared)', 540, 145);
+  ctx.fillText('BG Go / NoGo / GPi-like gates', 620, 130);
   ctx.fillText('Output A', 790, 120);
   ctx.fillText('Output B', 790, 350);
 }
@@ -405,7 +441,8 @@ function render() {
   ctx.fillText(`Dopamine(mod): ${M.dopamine.toFixed(3)}`, 20, 26);
   ctx.fillText(`Avg plastic w(A): ${avg(wAA).toFixed(3)}`, 20, 44);
   ctx.fillText(`Avg plastic w(B): ${avg(wBB).toFixed(3)}`, 20, 62);
-  ctx.fillText(`Last choice: ${M.lastChoice}`, 20, 80);
+  ctx.fillText(`BG gate GPi spikes A/B: ${M.bgGateA}/${M.bgGateB}`, 20, 80);
+  ctx.fillText(`Last choice: ${M.lastChoice}`, 20, 98);
 }
 
 ui.stepBtn.addEventListener('click', () => {
