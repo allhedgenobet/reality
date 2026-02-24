@@ -125,6 +125,8 @@ function maybeSpawnGrazersFromDensity() {
     grazers.push({
       x: (cx + 0.5) * cell,
       y: (cy + 0.5) * cell,
+      px: (cx + 0.5) * cell,
+      py: (cy + 0.5) * cell,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       r: 9,
@@ -154,6 +156,14 @@ function updateGrazers() {
     z.vx = (z.vx / vMag) * targetSpeed;
     z.vy = (z.vy / vMag) * targetSpeed;
 
+    // Erase prior grazer body so it doesn't leave trails.
+    if (Number.isFinite(z.px) && Number.isFinite(z.py)) {
+      ctx.fillStyle = 'rgba(0,0,0,1)';
+      ctx.beginPath();
+      ctx.arc(z.px, z.py, 4.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     z.x += z.vx;
     z.y += z.vy;
 
@@ -179,6 +189,8 @@ function updateGrazers() {
         newborn.push({
           x: z.x + Math.cos(ang) * 8,
           y: z.y + Math.sin(ang) * 8,
+          px: z.x + Math.cos(ang) * 8,
+          py: z.y + Math.sin(ang) * 8,
           vx: Math.cos(ang) * spd,
           vy: Math.sin(ang) * spd,
           r: 7,
@@ -193,13 +205,6 @@ function updateGrazers() {
       z.breedCooldown = 200 + Math.random() * 220;
     }
 
-    // Very discreet feeding radius
-    ctx.strokeStyle = `rgba(255,220,120,${0.04 * z.life})`;
-    ctx.lineWidth = 0.7;
-    ctx.beginPath();
-    ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2);
-    ctx.stroke();
-
     // Grazer body (small circular unit)
     const bodyR = 1.6 + z.life * 0.8;
     ctx.fillStyle = `rgba(245,230,165,${0.55 * z.life + 0.18})`;
@@ -212,6 +217,9 @@ function updateGrazers() {
     ctx.beginPath();
     ctx.arc(z.x, z.y, bodyR, 0, Math.PI * 2);
     ctx.stroke();
+
+    z.px = z.x;
+    z.py = z.y;
   }
 
   grazers.push(...newborn);
