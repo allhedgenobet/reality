@@ -1,5 +1,5 @@
-import { createRng } from './core/rng.js?v=20260223-10';
-import { createWorld } from './core/world.js?v=20260223-10';
+import { createRng } from './core/rng.js?v=20260223-11';
+import { createWorld } from './core/world.js?v=20260223-11';
 
 const DT = 0.06;
 const MS_PER_TICK = DT * 1000;

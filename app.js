@@ -12,7 +12,7 @@ let hasFreshFrame = false;
 let cameraSendTimer = null;
 let lastRenderAt = 0;
 
-const worker = new Worker(new URL('./sim.worker.js?v=20260223-10', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./sim.worker.js?v=20260223-11', import.meta.url), { type: 'module' });
 
 const state = {
   tick: 0,
