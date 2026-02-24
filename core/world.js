@@ -876,6 +876,35 @@ export function createWorld(rng) {
     }
     const apexGrid = buildSpatialIndex(apexList, 14);
 
+    // Phase 5 typed lanes for metabolism/predation loops
+    const predatorLane = [];
+    for (const [id, pred] of predator.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      predatorLane.push({ id, pred, pos });
+    }
+
+    const apexLane = [];
+    for (const [id, ap] of apex.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      apexLane.push({ id, ap, pos });
+    }
+
+    const coralLane = [];
+    for (const [id, cr] of coral.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      coralLane.push({ id, cr, pos });
+    }
+
+    const titanLane = [];
+    for (const [id, tt] of titan.entries()) {
+      const pos = position.get(id);
+      if (!pos) continue;
+      titanLane.push({ id, tt, pos });
+    }
+
     for (const [id, ag] of agent.entries()) {
       const dna = ag.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       ag.energy -= baseDrain * dna.metabolism * dt;
@@ -903,7 +932,10 @@ export function createWorld(rng) {
     // Predators eat agents
     const predEatRadius = 9;
     const predDrain = baseDrain * 1.9;
-    for (const [pid, pred] of predator.entries()) {
+    for (const lane of predatorLane) {
+      const pid = lane.id;
+      const pred = lane.pred;
+      const ppos = lane.pos;
       const dna = pred.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       const aggression = Math.max(0.2, Math.min(1.4, dna.speed + dna.sense - dna.metabolism));
 
@@ -914,9 +946,6 @@ export function createWorld(rng) {
       const restFactor = pred.rest > 0 ? 0.4 : 1.0;
       pred.energy -= predDrain * dna.metabolism * (0.7 + aggression * 0.4) * dt * restFactor;
       if (pred.energy < 0) pred.energy = 0;
-
-      const ppos = position.get(pid);
-      if (!ppos) continue;
 
       // Skip hunting if still resting from a previous kill
       if (pred.rest > 0) continue;
@@ -961,7 +990,10 @@ export function createWorld(rng) {
     const apexEatRadius = 12;
     const apexDrain = baseDrain * 1.1;
     const VENOM_ENERGY_PENALTY = 0.5; // fraction by which high-venom coral reduces apex energy gain
-    for (const [aid, ap] of apex.entries()) {
+    for (const lane of apexLane) {
+      const aid = lane.id;
+      const ap = lane.ap;
+      const apos = lane.pos;
       const dna = ap.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       ap.rest = Math.max(0, (ap.rest || 0) - dt);
       ap.age = (ap.age || 0) + dt;
@@ -969,9 +1001,6 @@ export function createWorld(rng) {
       const restFactor = ap.rest > 0 ? 0.3 : 1.0;
       ap.energy -= apexDrain * dna.metabolism * dt * restFactor;
       if (ap.energy < 0) ap.energy = 0;
-
-      const apos = position.get(aid);
-      if (!apos) continue;
 
       // Skip hunting while resting
       if (ap.rest > 0) continue;
@@ -1020,7 +1049,10 @@ export function createWorld(rng) {
     // Titans metabolize and eat apex
     const titanEatRadius = 13;
     const titanDrain = baseDrain * 1.25;
-    for (const [tid, tt] of titan.entries()) {
+    for (const lane of titanLane) {
+      const tid = lane.id;
+      const tt = lane.tt;
+      const tpos = lane.pos;
       const dna = tt.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0 };
       tt.rest = Math.max(0, (tt.rest || 0) - dt);
       tt.age = (tt.age || 0) + dt;
@@ -1029,8 +1061,7 @@ export function createWorld(rng) {
       tt.energy -= titanDrain * dna.metabolism * dt * restFactor;
       if (tt.energy < 0) tt.energy = 0;
 
-      const tpos = position.get(tid);
-      if (!tpos || tt.rest > 0) continue;
+      if (tt.rest > 0) continue;
 
       const nearbyApex = querySpatial(apexGrid, tpos.x, tpos.y, titanEatRadius);
       for (const prey of nearbyApex) {
@@ -1052,7 +1083,10 @@ export function createWorld(rng) {
     // Coral metabolism and eating agents
     const coralEatRadius = 8;
     const coralDrain = baseDrain * 1.5;
-    for (const [cid, cr] of coral.entries()) {
+    for (const lane of coralLane) {
+      const cid = lane.id;
+      const cr = lane.cr;
+      const cpos = lane.pos;
       const dna = cr.dna || { speed: 1, sense: 1, metabolism: 1, hueShift: 0, venom: 0 };
       cr.rest = Math.max(0, (cr.rest || 0) - dt);
       cr.age = (cr.age || 0) + dt;
@@ -1060,9 +1094,6 @@ export function createWorld(rng) {
       const restFactor = cr.rest > 0 ? 0.4 : 1.0;
       cr.energy -= coralDrain * dna.metabolism * dt * restFactor;
       if (cr.energy < 0) cr.energy = 0;
-
-      const cpos = position.get(cid);
-      if (!cpos) continue;
 
       if (cr.rest > 0) continue;
 

@@ -194,7 +194,7 @@ onmessage = (e) => {
   if (type === 'pause') running = false;
   if (type === 'resume') running = true;
   if (type === 'setZoom' && Number.isFinite(zoom)) {
-    world.camera.zoom = Math.max(0.3, Math.min(4, zoom));
+    world.camera.zoom = Math.max(0.03, Math.min(8, zoom));
   }
 };
 
