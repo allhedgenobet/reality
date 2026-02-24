@@ -65,7 +65,7 @@ function spawnTree(x, y, scale = 1, inheritedGenes = null) {
   const angle = Math.random() * Math.PI * 2;
   const genes = inheritedGenes ? mutateGenes(inheritedGenes, 0.13) : createBaseGenes();
   const width = (2.1 + Math.random() * 0.9) * scale * genes.vigor;
-  const energy = (280 + Math.random() * 170) * scale * genes.vigor;
+  const energy = (420 + Math.random() * 260) * scale * genes.vigor;
   tips.push(new Tip(x, y, angle, width, energy, genes));
 }
 
@@ -178,8 +178,8 @@ function step() {
     }
     t.burning = Math.max(0, t.burning * 0.9 + fireExposure * 0.75);
     if (t.burning > 0.05) {
-      t.energy -= 1.4 * t.burning;
-      t.width *= 1 - 0.008 * t.burning;
+      t.energy -= 0.9 * t.burning;
+      t.width *= 1 - 0.0045 * t.burning;
     }
 
     const ageStop = (1 - Math.min(1, t.energy / (320 * g.vigor))) * 0.028;
@@ -210,8 +210,8 @@ function step() {
 
     t.x = nx;
     t.y = ny;
-    t.energy -= 1;
-    t.width *= 0.997;
+    t.energy -= 0.72;
+    t.width *= 0.9983;
 
     const bChance = branchChance * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias;
     if (Math.random() < bChance && t.width > 0.45 && t.energy > 15) {
