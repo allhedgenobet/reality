@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Branch Tree</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="ui">
+      <button id="resetBtn">Reset</button>
+      <label>
+        Branch chance
+        <input id="branchChance" type="range" min="0.01" max="0.25" step="0.01" value="0.08" />
+      </label>
+      <label>
+        Stop chance
+        <input id="stopChance" type="range" min="0.001" max="0.08" step="0.001" value="0.012" />
+      </label>
+      <label>
+        Wind
+        <input id="wind" type="range" min="-0.02" max="0.02" step="0.001" value="0" />
+      </label>
+      <div id="stats"></div>
+    </div>
+
+    <canvas id="c" width="1200" height="760"></canvas>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
