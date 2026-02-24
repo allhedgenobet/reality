@@ -125,18 +125,21 @@ function maybeSpawnGrazersFromDensity() {
       y: (cy + 0.5) * cell,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      r: 10,
-      maxR: 110 + Math.random() * 40,
+      r: 9,
+      maxR: 38 + Math.random() * 20,
       life: 1,
-      growRate: 0.65 + Math.random() * 0.8,
-      fadeRate: 0.003 + Math.random() * 0.004,
+      growRate: 0.12 + Math.random() * 0.2,
+      fadeRate: 0.0025 + Math.random() * 0.003,
       turniness: 0.03 + Math.random() * 0.06,
+      breedCooldown: 220 + Math.random() * 180,
     });
     break;
   }
 }
 
 function updateGrazers() {
+  const newborn = [];
+
   for (const z of grazers) {
     z.r = Math.min(z.maxR, z.r + z.growRate);
     z.life -= z.fadeRate;
@@ -145,7 +148,7 @@ function updateGrazers() {
     z.vx += (Math.random() * 2 - 1) * z.turniness;
     z.vy += (Math.random() * 2 - 1) * z.turniness;
     const vMag = Math.hypot(z.vx, z.vy) || 1;
-    const targetSpeed = 0.4 + z.life * 0.8;
+    const targetSpeed = 0.22 + z.life * 0.5;
     z.vx = (z.vx / vMag) * targetSpeed;
     z.vy = (z.vy / vMag) * targetSpeed;
 
@@ -158,29 +161,59 @@ function updateGrazers() {
     z.x = clamp(z.x, 0, window.innerWidth);
     z.y = clamp(z.y, 0, window.innerHeight);
 
-    const grad = ctx.createRadialGradient(z.x, z.y, 0, z.x, z.y, z.r);
-    grad.addColorStop(0, `rgba(255,235,120,${0.16 * z.life})`);
-    grad.addColorStop(0.45, `rgba(220,170,60,${0.1 * z.life})`);
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
+    // Grazer reproduction: occasionally bud a child near rich tree areas
+    z.breedCooldown -= 1;
+    if (z.breedCooldown <= 0 && z.life > 0.25) {
+      let nearbyTips = 0;
+      const rr = 42;
+      for (const t of tips) {
+        const dx = t.x - z.x;
+        const dy = t.y - z.y;
+        if (dx * dx + dy * dy < rr * rr) nearbyTips++;
+      }
+      if (nearbyTips > 10 && Math.random() < 0.12) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 0.18 + Math.random() * 0.35;
+        newborn.push({
+          x: z.x + Math.cos(ang) * 8,
+          y: z.y + Math.sin(ang) * 8,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          r: 7,
+          maxR: 30 + Math.random() * 14,
+          life: 0.75,
+          growRate: 0.1 + Math.random() * 0.15,
+          fadeRate: z.fadeRate * (1.05 + Math.random() * 0.3),
+          turniness: z.turniness,
+          breedCooldown: 260 + Math.random() * 220,
+        });
+      }
+      z.breedCooldown = 200 + Math.random() * 220;
+    }
+
+    // Very discreet feeding radius
+    ctx.strokeStyle = `rgba(255,220,120,${0.04 * z.life})`;
+    ctx.lineWidth = 0.7;
     ctx.beginPath();
     ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.stroke();
 
-    // Grazer body (little round dot)
-    const bodyR = 2.2 + z.life * 1.6;
-    ctx.fillStyle = `rgba(255,245,170,${0.85 * z.life + 0.1})`;
+    // Grazer body (small circular unit)
+    const bodyR = 1.6 + z.life * 0.8;
+    ctx.fillStyle = `rgba(245,230,165,${0.55 * z.life + 0.18})`;
     ctx.beginPath();
     ctx.arc(z.x, z.y, bodyR, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = `rgba(140,110,40,${0.6 * z.life + 0.2})`;
-    ctx.lineWidth = 0.9;
+    ctx.strokeStyle = `rgba(120,95,36,${0.35 * z.life + 0.2})`;
+    ctx.lineWidth = 0.7;
     ctx.beginPath();
     ctx.arc(z.x, z.y, bodyR, 0, Math.PI * 2);
     ctx.stroke();
   }
 
+  grazers.push(...newborn);
+  if (grazers.length > 220) grazers.splice(0, grazers.length - 220);
   grazers = grazers.filter((z) => z.life > 0.02);
 }
 
@@ -227,7 +260,7 @@ function step() {
     const jitter = (Math.random() * 2 - 1) * g.jitter;
     t.angle += jitter + wind + g.turnBias;
 
-    const stepLen = (2.1 + Math.random() * 1.5) * (0.9 + 0.25 * g.vigor);
+    const stepLen = (1.1 + Math.random() * 0.9) * (0.85 + 0.18 * g.vigor);
     const nx = t.x + Math.cos(t.angle) * stepLen;
     const ny = t.y + Math.sin(t.angle) * stepLen;
 
@@ -246,7 +279,7 @@ function step() {
     t.energy -= 0.72;
     t.width *= 0.9983;
 
-    const bChance = branchChance * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias;
+    const bChance = branchChance * 0.72 * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias;
     if (Math.random() < bChance && t.width > 0.45 && t.energy > 15) {
       const split = 0.2 + Math.random() * 0.55;
       const childGenesA = mutateGenes(g, 0.08);
@@ -292,7 +325,7 @@ function loop() {
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
   if (tips.length > 0) {
-    for (let i = 0; i < 3; i++) step();
+    step();
   }
 
   requestAnimationFrame(loop);
