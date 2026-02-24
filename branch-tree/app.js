@@ -392,7 +392,7 @@ function step() {
     const curlDir = Math.sin((t.x + t.y) * 0.01) >= 0 ? 1 : -1;
     t.angle += jitter + wind * 0.55 + g.turnBias + curlDir * g.curl;
 
-    const stepLen = (0.8 + Math.random() * 0.65) * (0.85 + 0.18 * g.vigor);
+    const stepLen = (1.1 + Math.random() * 0.8) * (0.85 + 0.18 * g.vigor);
     const nx = t.x + Math.cos(t.angle) * stepLen;
     const ny = t.y + Math.sin(t.angle) * stepLen;
 
@@ -416,8 +416,8 @@ function step() {
 
     t.x = nx;
     t.y = ny;
-    t.energy -= 0.72;
-    t.width *= 0.9983;
+    t.energy -= 0.65;
+    t.width *= 0.9991;
 
     const crowdingFactor = 1 / (1 + competition * 3.5);
     const bChance = branchChance * 0.88 * (0.6 + Math.min(1, t.energy / 220)) * g.branchBias * crowdingFactor;
