@@ -166,6 +166,19 @@ function updateGrazers() {
     ctx.beginPath();
     ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2);
     ctx.fill();
+
+    // Grazer body (little round dot)
+    const bodyR = 2.2 + z.life * 1.6;
+    ctx.fillStyle = `rgba(255,245,170,${0.85 * z.life + 0.1})`;
+    ctx.beginPath();
+    ctx.arc(z.x, z.y, bodyR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(140,110,40,${0.6 * z.life + 0.2})`;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.arc(z.x, z.y, bodyR, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   grazers = grazers.filter((z) => z.life > 0.02);
