@@ -62,10 +62,69 @@ function buildSnapshot() {
   };
 }
 
+const DELTA_COMPONENTS = ['agent', 'predator', 'apex', 'coral', 'titan', 'burst', 'resource', 'forceField'];
+let prevSnapshot = null;
+let lastFullAt = 0;
+const FULL_SNAPSHOT_MS = 2000;
+
+function listToMap(list) {
+  const m = new Map();
+  for (const e of list || []) m.set(e.id, e);
+  return m;
+}
+
+function diffLists(prevList, nextList) {
+  const prev = listToMap(prevList);
+  const next = listToMap(nextList);
+  const upserts = [];
+  const removes = [];
+
+  for (const [id, cur] of next.entries()) {
+    const old = prev.get(id);
+    if (!old || JSON.stringify(old) !== JSON.stringify(cur)) upserts.push(cur);
+  }
+  for (const id of prev.keys()) {
+    if (!next.has(id)) removes.push(id);
+  }
+
+  return { upserts, removes };
+}
+
 function postSnapshot(now, force = false) {
   if (!force && now - lastSnapshotAt < SNAPSHOT_MS) return;
   lastSnapshotAt = now;
-  postMessage({ type: 'snapshot', snapshot: buildSnapshot() });
+
+  const full = buildSnapshot();
+  const shouldSendFull = force || !prevSnapshot || (now - lastFullAt > FULL_SNAPSHOT_MS);
+
+  if (shouldSendFull) {
+    postMessage({ type: 'snapshot', mode: 'full', snapshot: full });
+    prevSnapshot = full;
+    lastFullAt = now;
+    return;
+  }
+
+  const deltaComponents = {};
+  for (const key of DELTA_COMPONENTS) {
+    deltaComponents[key] = diffLists(prevSnapshot.components[key], full.components[key]);
+  }
+
+  postMessage({
+    type: 'snapshot',
+    mode: 'delta',
+    snapshot: {
+      tick: full.tick,
+      seed: full.seed,
+      width: full.width,
+      height: full.height,
+      regime: full.regime,
+      camera: full.camera,
+      perf: full.perf,
+      components: deltaComponents,
+    },
+  });
+
+  prevSnapshot = full;
 }
 
 function stepFrame(now) {
