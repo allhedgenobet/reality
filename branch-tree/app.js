@@ -433,7 +433,7 @@ function step() {
       newTips.push(childA, childB);
     }
 
-    const canReproduce = t.energy > 45 && t.width > 0.55;
+    const canReproduce = t.energy > 5 && t.width > 0.05;
     if (canReproduce && Math.random() < 0.0038 * crowdingFactor) {
       const sx = t.x + (Math.random() * 2 - 1) * 14;
       const sy = t.y + (Math.random() * 2 - 1) * 14;
