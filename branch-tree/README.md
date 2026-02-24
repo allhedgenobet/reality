@@ -12,6 +12,7 @@ A minimalist 2D generative branching tree on a black background.
 - Grazers can reproduce in dense feeding zones
 - Added a higher trophic predator level that hunts grazers
 - Tree competition/crowding pressure reduces branching + reproduction in dense patches
+- One-branch-per-pixel occupancy rule prevents overlapping branch traces
 
 ## Run
 

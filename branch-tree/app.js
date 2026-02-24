@@ -18,6 +18,16 @@ function resize() {
   canvas.width = Math.floor(w * dpr);
   canvas.height = Math.floor(h * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  occW = w;
+  occH = h;
+  occupancy = new Uint8Array(occW * occH);
+}
+
+function occIndex(x, y) {
+  const xi = Math.max(0, Math.min(occW - 1, Math.round(x)));
+  const yi = Math.max(0, Math.min(occH - 1, Math.round(y)));
+  return yi * occW + xi;
 }
 
 function createBaseGenes() {
@@ -61,6 +71,9 @@ let tips = [];
 let segments = 0;
 let grazers = [];
 let predators = [];
+let occupancy = null;
+let occW = 0;
+let occH = 0;
 
 function spawnTree(x, y, scale = 1, inheritedGenes = null) {
   const angle = Math.random() * Math.PI * 2;
@@ -68,6 +81,7 @@ function spawnTree(x, y, scale = 1, inheritedGenes = null) {
   const width = (2.1 + Math.random() * 0.9) * scale * genes.vigor;
   const energy = (420 + Math.random() * 260) * scale * genes.vigor;
   tips.push(new Tip(x, y, angle, width, energy, genes));
+  if (occupancy) occupancy[occIndex(x, y)] = 1;
 }
 
 function reset() {
@@ -78,6 +92,7 @@ function reset() {
   tips = [];
   grazers = [];
   predators = [];
+  if (occupancy) occupancy.fill(0);
   segments = 0;
 }
 
@@ -378,7 +393,15 @@ function step() {
     const nx = t.x + Math.cos(t.angle) * stepLen;
     const ny = t.y + Math.sin(t.angle) * stepLen;
 
+    // One-branch-per-pixel rule: if target pixel already occupied, stop this tip.
+    const idx = occIndex(nx, ny);
+    if (occupancy[idx] === 1) {
+      t.alive = false;
+      continue;
+    }
+
     drawSegment(t.x, t.y, nx, ny, t.width, g, 1, t.grazed);
+    occupancy[idx] = 1;
     segments++;
 
     if (Math.random() < 0.008 && t.width < 1.2) {
