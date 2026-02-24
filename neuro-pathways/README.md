@@ -5,8 +5,9 @@ A lightweight, browser-based simulation of **brain-inspired decision pathways**.
 ## What this models (and what it doesn't)
 
 - ✅ Competing neural populations (Choice A vs Choice B)
-- ✅ Excitatory + inhibitory dynamics
-- ✅ Reward-modulated Hebbian-style plasticity
+- ✅ Spiking LIF-like neurons with refractory periods
+- ✅ Excitatory + inhibitory dynamics with synaptic delays
+- ✅ Reward-modulated STDP-style plasticity (simplified)
 - ✅ Noisy decision process over time
 - ❌ Full biological realism (ion channels, detailed spiking physiology, etc.)
 

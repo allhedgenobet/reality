@@ -19,93 +19,278 @@ const ui = {
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+const TYPES = {
+  INPUT: 'input',
+  EXC: 'exc',
+  INH: 'inh',
+  OUTPUT: 'output',
+};
+
+function createNeuron(id, type, pathway, x, y) {
+  return {
+    id,
+    type,
+    pathway, // 'A' | 'B' | 'shared'
+    x,
+    y,
+    v: -65,
+    vRest: -65,
+    vReset: -68,
+    vThresh: type === TYPES.OUTPUT ? -51 : -50,
+    tauM: type === TYPES.INH ? 14 : 18,
+    refSteps: type === TYPES.INH ? 2 : 3,
+    refLeft: 0,
+    inputCurrent: 0,
+    spike: false,
+    trace: 0,
+  };
+}
+
 function createModel() {
+  const neurons = [];
+  let id = 0;
+
+  // Inputs
+  const inA = createNeuron(id++, TYPES.INPUT, 'A', 120, 180);
+  const inB = createNeuron(id++, TYPES.INPUT, 'B', 120, 450);
+  inA.vThresh = -58;
+  inB.vThresh = -58;
+  neurons.push(inA, inB);
+
+  // L2/3-like pathway pools
+  const excA = [];
+  const excB = [];
+  for (let i = 0; i < 8; i++) {
+    excA.push(createNeuron(id++, TYPES.EXC, 'A', 320 + (i % 2) * 45, 120 + i * 32));
+    excB.push(createNeuron(id++, TYPES.EXC, 'B', 320 + (i % 2) * 45, 390 + i * 32));
+  }
+  neurons.push(...excA, ...excB);
+
+  // Shared interneurons (PV/SST-ish proxy)
+  const inh = [];
+  for (let i = 0; i < 6; i++) inh.push(createNeuron(id++, TYPES.INH, 'shared', 560 + (i % 2) * 45, 180 + i * 45));
+  neurons.push(...inh);
+
+  // Output populations (L5-ish decision readout)
+  const outA = [];
+  const outB = [];
+  for (let i = 0; i < 3; i++) {
+    outA.push(createNeuron(id++, TYPES.OUTPUT, 'A', 820, 150 + i * 70));
+    outB.push(createNeuron(id++, TYPES.OUTPUT, 'B', 820, 380 + i * 70));
+  }
+  neurons.push(...outA, ...outB);
+
+  const edges = [];
+  const byId = new Map(neurons.map((n) => [n.id, n]));
+
+  const addEdge = (pre, post, w, delay = 1, plastic = false) => {
+    edges.push({ pre, post, w, delay, plastic, preType: byId.get(pre).type });
+  };
+
+  const connectDense = (pres, posts, wMin, wMax, delay, plastic = false) => {
+    for (const p of pres) for (const q of posts) addEdge(p.id, q.id, wMin + Math.random() * (wMax - wMin), delay, plastic);
+  };
+
+  // Inputs -> pathway excitatory populations
+  connectDense([inA], excA, 1.0, 1.3, 1, true);
+  connectDense([inB], excB, 1.0, 1.3, 1, true);
+
+  // Recurrent local excitation
+  connectDense(excA, excA, 0.05, 0.18, 1, true);
+  connectDense(excB, excB, 0.05, 0.18, 1, true);
+
+  // Pathway -> output
+  connectDense(excA, outA, 0.8, 1.2, 2, true);
+  connectDense(excB, outB, 0.8, 1.2, 2, true);
+
+  // Weak cross-talk
+  connectDense(excA, outB, 0.05, 0.15, 2, true);
+  connectDense(excB, outA, 0.05, 0.15, 2, true);
+
+  // Exc -> interneuron
+  connectDense(excA, inh, 0.35, 0.65, 1, false);
+  connectDense(excB, inh, 0.35, 0.65, 1, false);
+
+  // Interneuron -> output inhibition
+  connectDense(inh, outA, -1.2, -0.8, 1, false);
+  connectDense(inh, outB, -1.2, -0.8, 1, false);
+
+  // Add simple delay buffer (fixed horizon)
+  const maxDelay = 3;
+  const delayBuffer = Array.from({ length: maxDelay + 1 }, () => []);
+
   return {
     tick: 0,
     running: true,
     reward: 0,
     history: [],
-    act: {
-      inA: 0,
-      inB: 0,
-      hidA: 0,
-      hidB: 0,
-      outA: 0,
-      outB: 0,
-      inh: 0,
-    },
-    w: {
-      inA_hidA: 0.9,
-      inB_hidB: 0.9,
-      hidA_outA: 1.0,
-      hidB_outB: 1.0,
-      hidA_outB: 0.15,
-      hidB_outA: 0.15,
-      outA_inh: 0.7,
-      outB_inh: 0.7,
-      inh_outA: 0.9,
-      inh_outB: 0.9,
-    },
+    neurons,
+    edges,
+    byId,
+    groups: { inA, inB, excA, excB, inh, outA, outB },
+    delayBuffer,
+    bufferIndex: 0,
+    dopamine: 0,
+    lastChoice: '-',
+    rasterA: [],
+    rasterB: [],
   };
 }
 
 let M = createModel();
 
-function step() {
+function poissonSpike(probPerStep) {
+  return Math.random() < probPerStep;
+}
+
+function emitSpike(neuron) {
+  neuron.spike = true;
+  neuron.v = neuron.vReset;
+  neuron.refLeft = neuron.refSteps;
+  neuron.trace = 1;
+}
+
+function updateTraces() {
+  for (const n of M.neurons) n.trace *= 0.92;
+}
+
+function scheduleSynapticEvents(spikingNeuronIds) {
+  for (const edge of M.edges) {
+    if (!spikingNeuronIds.has(edge.pre)) continue;
+    const slot = (M.bufferIndex + edge.delay) % M.delayBuffer.length;
+    M.delayBuffer[slot].push({ post: edge.post, w: edge.w });
+  }
+}
+
+function applyScheduledCurrents() {
+  const slot = M.delayBuffer[M.bufferIndex];
+  for (const ev of slot) {
+    const n = M.byId.get(ev.post);
+    if (!n) continue;
+    n.inputCurrent += ev.w;
+  }
+  slot.length = 0;
+}
+
+function applyExternalStimulus() {
   const stimA = Number(ui.stimA.value);
   const stimB = Number(ui.stimB.value);
   const noise = Number(ui.noise.value);
-  const eta = Number(ui.eta.value);
-  const inhib = Number(ui.inhib.value);
-  const rewardA = ui.rewardTargetA.checked;
 
-  const n = () => (Math.random() * 2 - 1) * noise;
-  const a = M.act;
-  const w = M.w;
+  const baseRate = 0.06;
+  const rateA = clamp(baseRate + stimA * 0.18 + (Math.random() * 2 - 1) * noise * 0.03, 0, 0.5);
+  const rateB = clamp(baseRate + stimB * 0.18 + (Math.random() * 2 - 1) * noise * 0.03, 0, 0.5);
 
-  a.inA = clamp(stimA + n(), 0, 1.4);
-  a.inB = clamp(stimB + n(), 0, 1.4);
+  if (poissonSpike(rateA)) emitSpike(M.groups.inA);
+  if (poissonSpike(rateB)) emitSpike(M.groups.inB);
+}
 
-  const hidALeak = a.hidA * 0.8;
-  const hidBLeak = a.hidB * 0.8;
-  a.hidA = clamp(hidALeak + a.inA * w.inA_hidA + n(), 0, 2.5);
-  a.hidB = clamp(hidBLeak + a.inB * w.inB_hidB + n(), 0, 2.5);
+function integrateNeurons() {
+  const noise = Number(ui.noise.value);
+  const inhibScale = Number(ui.inhib.value);
 
-  a.inh = clamp(a.inh * 0.75 + (a.outA * w.outA_inh + a.outB * w.outB_inh) * 0.4 + n(), 0, 2.8);
+  const spiking = new Set();
 
-  const rawOutA = a.outA * 0.72 + a.hidA * w.hidA_outA + a.hidB * w.hidB_outA - a.inh * w.inh_outA * inhib + n();
-  const rawOutB = a.outB * 0.72 + a.hidB * w.hidB_outB + a.hidA * w.hidA_outB - a.inh * w.inh_outB * inhib + n();
+  for (const n of M.neurons) {
+    if (n.type === TYPES.INPUT) {
+      if (n.spike) spiking.add(n.id);
+      n.inputCurrent = 0;
+      continue;
+    }
 
-  a.outA = clamp(rawOutA, 0, 3.2);
-  a.outB = clamp(rawOutB, 0, 3.2);
+    if (n.refLeft > 0) {
+      n.refLeft -= 1;
+      n.v = n.vReset;
+      n.spike = false;
+      n.inputCurrent = 0;
+      continue;
+    }
+
+    let iSyn = n.inputCurrent;
+    if (n.type === TYPES.INH) iSyn *= inhibScale;
+
+    const dv = ((n.vRest - n.v) + iSyn * 8 + (Math.random() * 2 - 1) * noise * 1.2) / n.tauM;
+    n.v += dv;
+
+    if (n.v >= n.vThresh) {
+      emitSpike(n);
+      spiking.add(n.id);
+    } else {
+      n.spike = false;
+    }
+
+    n.inputCurrent = 0;
+  }
+
+  return spiking;
+}
+
+function outputPopulationSpikeRate(pop) {
+  let s = 0;
+  for (const n of pop) if (n.spike) s++;
+  return s / pop.length;
+}
+
+function computeChoiceAndReward() {
+  const rA = outputPopulationSpikeRate(M.groups.outA);
+  const rB = outputPopulationSpikeRate(M.groups.outB);
 
   let choice = '-';
-  if (a.outA > 0.75 || a.outB > 0.75) {
-    choice = a.outA >= a.outB ? 'A' : 'B';
-  }
+  if (rA > 0 || rB > 0) choice = rA >= rB ? 'A' : 'B';
 
+  const rewardA = ui.rewardTargetA.checked;
   const reward = choice === '-' ? 0 : ((choice === 'A') === rewardA ? 1 : -1);
+
+  M.dopamine = reward * 0.6 + M.dopamine * 0.4;
   M.reward += reward;
-
-  // Reward-modulated Hebbian updates on decision pathways.
-  // Potentiate winning route if rewarded, depress otherwise.
-  if (choice !== '-') {
-    const sign = reward >= 0 ? 1 : -1;
-    const prePostA = a.hidA * a.outA;
-    const prePostB = a.hidB * a.outB;
-
-    if (choice === 'A') {
-      w.hidA_outA = clamp(w.hidA_outA + eta * sign * prePostA * 0.05, 0.2, 2.2);
-      w.hidA_outB = clamp(w.hidA_outB - eta * sign * prePostA * 0.03, 0.02, 1.4);
-    } else {
-      w.hidB_outB = clamp(w.hidB_outB + eta * sign * prePostB * 0.05, 0.2, 2.2);
-      w.hidB_outA = clamp(w.hidB_outA - eta * sign * prePostB * 0.03, 0.02, 1.4);
-    }
-  }
-
-  M.tick += 1;
+  M.lastChoice = choice;
   M.history.push(choice);
   if (M.history.length > 100) M.history.shift();
+
+  M.rasterA.push(rA);
+  M.rasterB.push(rB);
+  if (M.rasterA.length > 180) {
+    M.rasterA.shift();
+    M.rasterB.shift();
+  }
+
+  return { choice };
+}
+
+function stdpRewardUpdate() {
+  const eta = Number(ui.eta.value);
+  const mod = M.dopamine;
+
+  for (const e of M.edges) {
+    if (!e.plastic) continue;
+    const pre = M.byId.get(e.pre);
+    const post = M.byId.get(e.post);
+    if (!pre || !post) continue;
+
+    // Simple pair-based STDP proxy with eligibility traces.
+    const hebb = pre.trace * post.trace;
+    const dw = eta * hebb * mod * 0.06;
+    e.w = clamp(e.w + dw, e.w < 0 ? -2.0 : 0.01, 2.4);
+  }
+}
+
+function step() {
+  // Reset input spikes from previous step
+  M.groups.inA.spike = false;
+  M.groups.inB.spike = false;
+
+  applyExternalStimulus();
+  applyScheduledCurrents();
+
+  const spikingIds = integrateNeurons();
+  scheduleSynapticEvents(spikingIds);
+
+  const { choice } = computeChoiceAndReward();
+  stdpRewardUpdate();
+  updateTraces();
+
+  M.bufferIndex = (M.bufferIndex + 1) % M.delayBuffer.length;
+  M.tick += 1;
 
   const aWins = M.history.filter((c) => c === 'A').length;
   const valid = M.history.filter((c) => c !== '-').length || 1;
@@ -116,85 +301,111 @@ function step() {
   ui.accLabel.textContent = `A-win rate (100): ${Math.round((aWins / valid) * 100)}%`;
 }
 
-const NODES = {
-  inA: { x: 130, y: 170, label: 'Input A', key: 'inA', c: '#5fb8ff' },
-  inB: { x: 130, y: 440, label: 'Input B', key: 'inB', c: '#5fb8ff' },
-  hidA: { x: 410, y: 170, label: 'Pathway A', key: 'hidA', c: '#a08bff' },
-  hidB: { x: 410, y: 440, label: 'Pathway B', key: 'hidB', c: '#a08bff' },
-  inh: { x: 560, y: 310, label: 'Inhibitory', key: 'inh', c: '#ff8f8f' },
-  outA: { x: 810, y: 170, label: 'Choice A', key: 'outA', c: '#83ffa9' },
-  outB: { x: 810, y: 440, label: 'Choice B', key: 'outB', c: '#ffd37e' },
-};
-
-function drawEdge(a, b, w, polarity = 1) {
-  const A = NODES[a];
-  const B = NODES[b];
+function drawEdge(pre, post, w) {
   const mag = Math.min(1, Math.abs(w) / 1.4);
-  const alpha = 0.2 + mag * 0.8;
-  const width = 1 + mag * 5;
-  const col = polarity >= 0 ? `rgba(120,190,255,${alpha})` : `rgba(255,120,120,${alpha})`;
-
-  ctx.strokeStyle = col;
-  ctx.lineWidth = width;
+  ctx.strokeStyle = w >= 0 ? `rgba(110,190,255,${0.16 + mag * 0.6})` : `rgba(255,120,120,${0.16 + mag * 0.6})`;
+  ctx.lineWidth = 0.6 + mag * 2.2;
   ctx.beginPath();
-  ctx.moveTo(A.x, A.y);
-  ctx.lineTo(B.x, B.y);
+  ctx.moveTo(pre.x, pre.y);
+  ctx.lineTo(post.x, post.y);
   ctx.stroke();
 }
 
-function drawNode(node) {
-  const val = M.act[node.key];
-  const r = 24 + Math.min(1, val / 2.5) * 16;
-  const glow = 0.2 + Math.min(1, val / 2.5) * 0.8;
+function drawNode(n) {
+  const byType = {
+    [TYPES.INPUT]: '#67b6ff',
+    [TYPES.EXC]: '#8f7cff',
+    [TYPES.INH]: '#ff9a9a',
+    [TYPES.OUTPUT]: n.pathway === 'A' ? '#82ffa7' : '#ffd083',
+  };
 
-  ctx.fillStyle = `rgba(255,255,255,0.08)`;
+  const base = n.type === TYPES.OUTPUT ? 8 : 6;
+  const spikeGlow = n.spike ? 1 : 0;
+  const r = base + spikeGlow * 4;
+
+  ctx.fillStyle = byType[n.type];
+  ctx.globalAlpha = 0.35 + spikeGlow * 0.65;
   ctx.beginPath();
-  ctx.arc(node.x, node.y, r + 12, 0, Math.PI * 2);
+  ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = node.c;
-  ctx.globalAlpha = glow;
-  ctx.beginPath();
-  ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
-  ctx.fill();
   ctx.globalAlpha = 1;
-
-  ctx.strokeStyle = 'rgba(230,240,255,0.8)';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(235,240,255,0.55)';
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+  ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawLabels() {
+  ctx.fillStyle = '#cfdbff';
+  ctx.font = '12px sans-serif';
+  ctx.fillText('Input A', 86, 154);
+  ctx.fillText('Input B', 86, 424);
+  ctx.fillText('Excitatory pool A (L2/3-ish)', 265, 90);
+  ctx.fillText('Excitatory pool B (L2/3-ish)', 265, 360);
+  ctx.fillText('Interneurons (shared)', 540, 145);
+  ctx.fillText('Output A', 790, 120);
+  ctx.fillText('Output B', 790, 350);
+}
+
+function drawRaster() {
+  const x0 = 30;
+  const y0 = 520;
+  const w = 940;
+  const h = 80;
+
+  ctx.strokeStyle = 'rgba(180,200,255,0.25)';
+  ctx.strokeRect(x0, y0, w, h);
+
+  const n = M.rasterA.length;
+  if (!n) return;
+  const dx = w / Math.max(1, n - 1);
+
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(130,255,170,0.95)';
+  for (let i = 0; i < n; i++) {
+    const y = y0 + h - M.rasterA[i] * h;
+    const x = x0 + i * dx;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
   ctx.stroke();
 
-  ctx.fillStyle = '#eaf0ff';
-  ctx.font = '12px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(node.label, node.x, node.y - r - 10);
-  ctx.fillText(val.toFixed(2), node.x, node.y + 4);
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(255,205,135,0.95)';
+  for (let i = 0; i < n; i++) {
+    const y = y0 + h - M.rasterB[i] * h;
+    const x = x0 + i * dx;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = '#d4deff';
+  ctx.font = '11px monospace';
+  ctx.fillText('Output spike-rate trace (A=green, B=amber)', x0 + 8, y0 - 8);
 }
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  drawEdge('inA', 'hidA', M.w.inA_hidA, +1);
-  drawEdge('inB', 'hidB', M.w.inB_hidB, +1);
-  drawEdge('hidA', 'outA', M.w.hidA_outA, +1);
-  drawEdge('hidB', 'outB', M.w.hidB_outB, +1);
-  drawEdge('hidA', 'outB', M.w.hidA_outB, +1);
-  drawEdge('hidB', 'outA', M.w.hidB_outA, +1);
-  drawEdge('outA', 'inh', M.w.outA_inh, +1);
-  drawEdge('outB', 'inh', M.w.outB_inh, +1);
-  drawEdge('inh', 'outA', -M.w.inh_outA, -1);
-  drawEdge('inh', 'outB', -M.w.inh_outB, -1);
+  for (const e of M.edges) drawEdge(M.byId.get(e.pre), M.byId.get(e.post), e.w);
+  for (const n of M.neurons) drawNode(n);
 
-  Object.values(NODES).forEach(drawNode);
+  drawLabels();
+  drawRaster();
+
+  const wAA = M.edges.filter((e) => e.plastic && M.byId.get(e.pre).pathway === 'A' && M.byId.get(e.post).pathway === 'A');
+  const wBB = M.edges.filter((e) => e.plastic && M.byId.get(e.pre).pathway === 'B' && M.byId.get(e.post).pathway === 'B');
+  const avg = (arr) => arr.reduce((s, x) => s + x.w, 0) / Math.max(1, arr.length);
 
   ctx.fillStyle = '#b7c7ff';
-  ctx.font = '13px monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText(`w(hA→oA): ${M.w.hidA_outA.toFixed(3)}`, 20, 28);
-  ctx.fillText(`w(hB→oB): ${M.w.hidB_outB.toFixed(3)}`, 20, 48);
-  ctx.fillText(`w(hA→oB): ${M.w.hidA_outB.toFixed(3)}`, 20, 68);
-  ctx.fillText(`w(hB→oA): ${M.w.hidB_outA.toFixed(3)}`, 20, 88);
+  ctx.font = '12px monospace';
+  ctx.fillText(`Dopamine(mod): ${M.dopamine.toFixed(3)}`, 20, 26);
+  ctx.fillText(`Avg plastic w(A): ${avg(wAA).toFixed(3)}`, 20, 44);
+  ctx.fillText(`Avg plastic w(B): ${avg(wBB).toFixed(3)}`, 20, 62);
+  ctx.fillText(`Last choice: ${M.lastChoice}`, 20, 80);
 }
 
 ui.stepBtn.addEventListener('click', () => {
